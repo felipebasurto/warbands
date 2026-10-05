@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "L": "#minecraft:logs",
+    "P": "minecraft:paper",
+    "B": "minecraft:bricks",
+    "I": "minecraft:iron_ingot"
+  },
+  "pattern": [
+    "LPL",
+    "BIB"
+  ],
+  "result": {
+    "id": "warbands:house_blueprint"
+  }
+}

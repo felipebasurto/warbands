@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "warbands:block/alarm_horn_top",
+    "side": "warbands:block/alarm_horn_side"
+  }
+}

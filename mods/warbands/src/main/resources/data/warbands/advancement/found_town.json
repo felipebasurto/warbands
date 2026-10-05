@@ -1,0 +1,28 @@
+{
+  "display": {
+    "icon": {
+      "id": "minecraft:bell"
+    },
+    "title": {
+      "translate": "advancements.warbands.found_town.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.found_town.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "warbands:blueprint",
+  "rewards": {
+    "recipes": [
+      "warbands:house_blueprint"
+    ]
+  }
+}

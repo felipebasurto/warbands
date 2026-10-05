@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "id": "warbands:house_blueprint"
+    },
+    "title": {
+      "translate": "advancements.warbands.housing.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.housing.description"
+    },
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "warbands:found_town"
+}

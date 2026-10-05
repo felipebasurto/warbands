@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "top": "warbands:block/watch_tower_top",
+    "front": "warbands:block/watch_tower_front",
+    "side": "warbands:block/watch_tower_side"
+  }
+}

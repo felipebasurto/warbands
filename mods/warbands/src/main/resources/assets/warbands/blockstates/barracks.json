@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "warbands:block/barracks"
+    },
+    "facing=east": {
+      "model": "warbands:block/barracks",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "warbands:block/barracks",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "warbands:block/barracks",
+      "y": 270
+    }
+  }
+}

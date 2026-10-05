@@ -1,0 +1,105 @@
+// Shared build logic for every mod under mods/.
+// A mod folder only needs a gradle.properties with mod_id and mod_version,
+// plus an optional build.gradle for extra dependencies.
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
+}
+
+subprojects {
+	apply plugin: 'net.fabricmc.fabric-loom'
+
+	version = project.mod_version
+	group = rootProject.group
+
+	base {
+		archivesName = project.name
+	}
+
+	loom {
+		splitEnvironmentSourceSets()
+
+		mods {
+			register(project.mod_id) {
+				sourceSet sourceSets.main
+				sourceSet sourceSets.client
+			}
+		}
+
+		// Each mod gets its own run/ folder so worlds and options don't collide.
+		runConfigs.configureEach {
+			runDir = "run"
+		}
+	}
+
+	fabricApi {
+		// Data generation: ./gradlew :<mod>:runDatagen writes into src/main/generated
+		configureDataGeneration {
+			client = true
+		}
+	}
+
+	dependencies {
+		minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
+		implementation "net.fabricmc:fabric-loader:${rootProject.loader_version}"
+		implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
+
+		testImplementation platform('org.junit:junit-bom:5.13.4')
+		testImplementation 'org.junit.jupiter:junit-jupiter'
+		testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	}
+
+	processResources {
+		def props = [
+			version          : project.version,
+			minecraft_version: rootProject.minecraft_version,
+			loader_version   : rootProject.loader_version,
+		]
+		inputs.properties props
+		filesMatching("fabric.mod.json") {
+			expand props
+		}
+	}
+
+	tasks.withType(JavaCompile).configureEach {
+		it.options.release = rootProject.java_version as int
+		it.options.encoding = 'UTF-8'
+	}
+
+	tasks.withType(Test).configureEach {
+		useJUnitPlatform()
+	}
+
+	java {
+		withSourcesJar()
+		sourceCompatibility = JavaVersion.toVersion(rootProject.java_version)
+		targetCompatibility = JavaVersion.toVersion(rootProject.java_version)
+	}
+
+	jar {
+		from(rootProject.file("LICENSE")) {
+			rename { "${it}_${project.name}" }
+		}
+	}
+}
+
+// Copies chosen game-test screenshots into screenshots/ (gitignored). Opt-in, because most shots are the
+// same every run: ./gradlew archiveScreenshots -Pshots=army-castle,ui-stable (no -Pshots lists them).
+def archiveScript = file('scripts/archive-screenshots.py')
+tasks.register('archiveScreenshots', Exec) {
+	group = 'verification'
+	description = 'Copy chosen screenshots from mod runs into the gitignored screenshots/ archive'
+	def shots = providers.gradleProperty('shots')
+	commandLine(['python3', archiveScript.absolutePath] + (shots.isPresent() ? ['--only'] + shots.get().split(',').toList() : []))
+	workingDir rootDir
+}
+
+// Copy every mod's jar into build/all-mods/ for dropping into a mods folder.
+tasks.register('collectJars', Copy) {
+	group = 'build'
+	description = 'Builds every mod and copies the jars to build/all-mods'
+	subprojects.each { p -> dependsOn("${p.path}:build") }
+	from(subprojects.collect { it.layout.buildDirectory.dir('libs') }) {
+		exclude '*-sources.jar'
+	}
+	into layout.buildDirectory.dir('all-mods')
+}

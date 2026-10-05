@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "id": "warbands:battering_ram"
+    },
+    "title": {
+      "translate": "advancements.warbands.ram.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.ram.description"
+    },
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "warbands:siege_workshop"
+}

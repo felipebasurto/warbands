@@ -1,0 +1,21 @@
+pluginManagement {
+	repositories {
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+rootProject.name = 'warbands'
+
+// Every folder in mods/ that has a gradle.properties is a mod.
+// Gradle path is the folder name, e.g. ./gradlew :sky-lanterns:runClient
+file('mods').eachDir { dir ->
+	if (new File(dir, 'gradle.properties').exists()) {
+		include(dir.name)
+		project(":${dir.name}").projectDir = dir
+	}
+}

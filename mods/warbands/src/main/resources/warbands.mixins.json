@@ -1,0 +1,13 @@
+{
+	"required": true,
+	"package": "dev.felipe.warbands.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": ["StructureDropsMixin", "StructureFallingMixin", "StructurePistonMixin", "SoldierArrowMixin", "CampGuardMixin", "CampTriggerMixin", "HopperRewardMixin"],
+	"client": [],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "warbands:hearth",
+    "warbands:blacksmith",
+    "warbands:watch_tower",
+    "warbands:relic_pedestal"
+  ]
+}

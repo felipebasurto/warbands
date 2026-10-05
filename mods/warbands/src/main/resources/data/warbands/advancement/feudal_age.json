@@ -1,0 +1,30 @@
+{
+  "display": {
+    "icon": {
+      "id": "minecraft:diamond_block"
+    },
+    "title": {
+      "translate": "advancements.warbands.feudal_age.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.feudal_age.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "rewards": {
+    "recipes": [
+      "warbands:barracks_blueprint",
+      "warbands:archery_range_blueprint",
+      "warbands:blacksmith_blueprint"
+    ]
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "warbands:found_town"
+}

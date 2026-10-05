@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "id": "warbands:war_map"
+    },
+    "title": {
+      "translate": "advancements.warbands.war_map_bought.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.war_map_bought.description"
+    },
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "warbands:found_town"
+}

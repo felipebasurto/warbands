@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "warbands:block/supply_crate_top",
+    "side": "warbands:block/supply_crate_side"
+  }
+}

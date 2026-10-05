@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "warbands:block/blacksmith"
+    },
+    "facing=east": {
+      "model": "warbands:block/blacksmith",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "warbands:block/blacksmith",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "warbands:block/blacksmith",
+      "y": 270
+    }
+  }
+}

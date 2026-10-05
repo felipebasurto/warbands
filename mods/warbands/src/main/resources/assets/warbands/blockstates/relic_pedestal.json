@@ -1,0 +1,41 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "warbands:block/relic_pedestal"
+      }
+    },
+    {
+      "when": {
+        "hag": "true"
+      },
+      "apply": {
+        "model": "warbands:block/relic_pedestal_hag"
+      }
+    },
+    {
+      "when": {
+        "frost": "true"
+      },
+      "apply": {
+        "model": "warbands:block/relic_pedestal_frost"
+      }
+    },
+    {
+      "when": {
+        "grave": "true"
+      },
+      "apply": {
+        "model": "warbands:block/relic_pedestal_grave"
+      }
+    },
+    {
+      "when": {
+        "omen": "true"
+      },
+      "apply": {
+        "model": "warbands:block/relic_pedestal_omen"
+      }
+    }
+  ]
+}

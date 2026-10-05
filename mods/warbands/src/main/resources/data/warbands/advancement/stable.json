@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "id": "warbands:stable_blueprint"
+    },
+    "title": {
+      "translate": "advancements.warbands.stable.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.stable.description"
+    },
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "warbands:castle_age"
+}

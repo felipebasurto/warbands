@@ -1,0 +1,26 @@
+{
+  "display": {
+    "icon": {
+      "id": "minecraft:diamond_axe",
+      "components": {
+        "minecraft:item_model": "warbands:brakk_cleaver"
+      }
+    },
+    "title": {
+      "translate": "advancements.warbands.warlord_brakk.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.warlord_brakk.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "warbands:camp_illager_hall"
+}

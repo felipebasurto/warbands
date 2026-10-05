@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "sss",
+    "lll",
+    "s s"
+  ],
+  "key": {
+    "s": "minecraft:stick",
+    "l": "minecraft:leather"
+  },
+  "result": {
+    "id": "warbands:hide_rack"
+  }
+}

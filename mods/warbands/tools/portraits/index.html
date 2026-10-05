@@ -1,0 +1,337 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Warbands portraits</title>
+<style>body{margin:0;background:#556;color:#eee;font:14px sans-serif}#log{padding:8px;white-space:pre}canvas{display:block;max-width:100%}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+</head><body><div id="log">loading</div>
+<script type="module">
+// 3D portraits of Warbands units: the mod's own skins on a Minecraft-shaped model, vanilla item sprites as voxels,
+// the horse and the ram rebuilt from the same boxes and UVs the game uses. Posts PNGs to tools/portraits/serve.py.
+//   /?units=militia,ram&poses=idle,attack&prefix=x_     (defaults: every unit, every pose)
+//   /?raiders=1[&units=fort,keep]                         (the camps' own soldiers)
+import * as THREE from 'three';
+
+const W = 1000, H = 1500;
+const D = Math.PI / 180;
+const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true, preserveDrawingBuffer: true});
+renderer.setSize(W, H); renderer.setPixelRatio(1); renderer.setClearColor(0x000000, 0);
+document.body.appendChild(renderer.domElement);
+const log = msg => document.getElementById('log').textContent = msg;
+
+const loader = new THREE.TextureLoader();
+const cache = {};
+function tex(url) {
+	return cache[url] ??= new Promise(res => loader.load(url, t => { t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace; res(t); }));
+}
+async function pixels(url) {
+	const img = await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = url; });
+	const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+	const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+	return {w: img.width, h: img.height, data: g.getImageData(0, 0, img.width, img.height).data};
+}
+
+// ---- boxes with Minecraft's skin layout (front = +z, character's right = -x) ----
+function box(w, h, d, u, v, texture, grow = 0, tw = 64, th = 64) {
+	const g = new THREE.BoxGeometry(w + grow * 2, h + grow * 2, d + grow * 2);
+	const rects = [
+		[u + d + w, v + d, d, h], [u, v + d, d, h], [u + d, v, w, d],
+		[u + d + w, v, w, d], [u + d, v + d, w, h], [u + d + w + d, v + d, w, h],
+	];
+	const uv = g.attributes.uv;
+	rects.forEach(([x, y, rw, rh], f) => {
+		const l = x / tw, r = (x + rw) / tw, t = 1 - y / th, b = 1 - (y + rh) / th;
+		uv.setXY(f * 4 + 0, l, t); uv.setXY(f * 4 + 1, r, t); uv.setXY(f * 4 + 2, l, b); uv.setXY(f * 4 + 3, r, b);
+	});
+	return new THREE.Mesh(g, new THREE.MeshLambertMaterial({map: texture, transparent: true, alphaTest: 0.1}));
+}
+
+// ---- model-space helpers: game models have y down and the front at -z; the scene has y up and the front at +z ----
+const pivot = (parent, x, y, z, rx = 0, rz = 0) => {
+	const g = new THREE.Group(); g.position.set(x, 24 - y, -z); g.rotation.set(rx, 0, -rz); parent.add(g); return g;
+};
+function mbox(parent, [x0, y0, z0, w, h, d], [u, v], texture, grow = 0, tw = 64, th = 64) {
+	const m = box(w, h, d, u, v, texture, grow, tw, th);
+	m.position.set(x0 + w / 2, -(y0 + h / 2), -(z0 + d / 2));
+	parent.add(m); return m;
+}
+
+// ---- the humanoid (player layout) ----
+function part(skin, size, uvInner, uvOuter, center) {
+	const g = new THREE.Group();
+	for (const [uv, grow] of [[uvInner, 0], [uvOuter, 0.5]]) {
+		const m = box(size[0], size[1], size[2], uv[0], uv[1], skin, grow);
+		m.position.set(...center); g.add(m);
+	}
+	return g;
+}
+
+async function sprite(url, grip, scale, thick = 1) {
+	const {w, h, data} = await pixels(url);
+	const cells = [];
+	for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (data[(y * w + x) * 4 + 3] > 40) cells.push([x, y, data.slice((y * w + x) * 4, (y * w + x) * 4 + 3)]);
+	const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, thick), new THREE.MeshLambertMaterial({color: 0xffffff}), cells.length);
+	const m = new THREE.Matrix4();
+	cells.forEach(([x, y, rgb], i) => {
+		m.makeTranslation(x - grip[0] + 0.5, -(y - grip[1]) - 0.5, 0);
+		mesh.setMatrixAt(i, m);
+		mesh.setColorAt(i, new THREE.Color().setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace));
+	});
+	const g = new THREE.Group(); g.add(mesh); g.scale.setScalar(scale);
+	return g;
+}
+
+async function holder(hand, spec) {
+	const it = await sprite('/tex/' + spec.tex + '.png', spec.grip ?? [2, 13], spec.scale ?? 1.3);
+	const h = new THREE.Group(); h.rotation.set(Math.PI / 2, Math.PI / 2, -Math.PI / 4); h.add(it); hand.add(h); return h;
+}
+
+async function soldier(kit) {
+	const skin = await tex('/skin/' + kit.skin + '.png');
+	const root = new THREE.Group();
+	const P = {root, kit};
+	P.head = part(skin, [8, 8, 8], [0, 0], [32, 0], [0, 4, 0]); P.head.position.set(0, 24, 0);
+	P.body = part(skin, [8, 12, 4], [16, 16], [16, 32], [0, 0, 0]); P.body.position.set(0, 18, 0);
+	P.rArm = part(skin, [4, 12, 4], [40, 16], [40, 32], [0, -4, 0]); P.rArm.position.set(-6, 22, 0);
+	P.lArm = part(skin, [4, 12, 4], [32, 48], [48, 48], [0, -4, 0]); P.lArm.position.set(6, 22, 0);
+	P.rLeg = part(skin, [4, 12, 4], [0, 16], [0, 32], [0, -6, 0]); P.rLeg.position.set(-2, 12, 0);
+	P.lLeg = part(skin, [4, 12, 4], [16, 48], [0, 48], [0, -6, 0]); P.lLeg.position.set(2, 12, 0);
+	P.rider = new THREE.Group();            // the person alone; the horse sits beside it under `root`
+	for (const k of ['head', 'body', 'rArm', 'lArm', 'rLeg', 'lLeg']) P.rider.add(P[k]);
+	root.add(P.rider);
+	const hand = arm => { const a = new THREE.Group(); a.position.set(0, -9.5, 0); arm.add(a); return a; };
+	if (kit.right) P.rItem = await holder(hand(P.rArm), kit.right);
+	if (kit.left) P.lItem = await holder(hand(P.lArm), kit.left);
+	if (kit.shield) {
+		const sh = await tex('/tex/shield_base_nopattern.png');
+		const g = new THREE.BoxGeometry(12, 20, 1.5);
+		const rects = [[13, 1, 1, 22], [0, 1, 1, 22], [1, 0, 12, 1], [13, 0, 12, 1], [1, 1, 12, 22], [14, 1, 12, 22]];
+		const uv = g.attributes.uv;
+		rects.forEach(([x, y, rw, rh], f) => { const l = x / 64, r = (x + rw) / 64, t = 1 - y / 64, b = 1 - (y + rh) / 64;
+			uv.setXY(f * 4, l, t); uv.setXY(f * 4 + 1, r, t); uv.setXY(f * 4 + 2, l, b); uv.setXY(f * 4 + 3, r, b); });
+		const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({map: sh, transparent: true, alphaTest: 0.1}));
+		mesh.position.set(0, -3, -3.2); P.lArm.add(mesh); P.shield = mesh;
+	}
+	if (kit.mounted) {
+		P.horse = await horse(true);
+		root.add(P.horse.root);
+		P.rider.position.set(0, 9, 1);   // seated on the horse's back (its body top is at y 21, the hips at y 12)
+	}
+	return P;
+}
+
+// ---- the horse (HorseModel / AbstractEquineModel boxes) ----
+async function horse(armored) {
+	const skin = await tex('/tex/horse_white.png');
+	const armor = armored ? await tex('/tex/iron.png') : null;
+	const root = new THREE.Group();
+	const H = {root, lh: [], rh: [], lf: [], rf: [], neck: []};
+	for (const [t, g] of [[skin, 0], [armor, 0.35]]) {
+		if (!t) continue;
+		const body = pivot(root, 0, 11, 5);
+		mbox(body, [-5, -8, -17, 10, 10, 22], [0, 32], t, g + 0.05);
+		const tail = pivot(body, 0, -5, 2, Math.PI / 6);
+		mbox(tail, [-1.5, 0, 0, 3, 14, 4], [42, 36], t, g);
+		const neck = pivot(root, 0, 4, -12, Math.PI / 6);
+		mbox(neck, [-2.05, -6, -2, 4, 12, 7], [0, 35], t, g);
+		mbox(neck, [-3, -11, -2, 6, 5, 7], [0, 13], t, g);
+		mbox(neck, [-1, -11, 5.01, 2, 16, 2], [56, 36], t, g);
+		mbox(neck, [-2, -11, -7, 4, 5, 5], [0, 25], t, g);
+		if (g === 0) { mbox(neck, [0.55, -13, 4, 2, 3, 1], [19, 16], t); mbox(neck, [-2.55, -13, 4, 2, 3, 1], [19, 16], t); }
+		H.neck.push(neck);
+		for (const [name, px, pz, left] of [['lh', 4, 7, true], ['rh', -4, 7, false], ['lf', 4, -10, true], ['rf', -4, -10, false]]) {
+			const leg = pivot(root, px, 14, pz);
+			mbox(leg, [left ? -3 : -1, -1.01, pz < 0 ? -1.9 : -1, 4, 11, 4], [48, 21], t, g);
+			H[name].push(leg);
+		}
+	}
+	return H;
+}
+function horsePose(H, p) {
+	const set = (list, a) => list.forEach(l => l.rotation.x = a * D);
+	set(H.lh, p.lh ?? 0); set(H.rh, p.rh ?? 0); set(H.lf, p.lf ?? 0); set(H.rf, p.rf ?? 0);
+	H.neck.forEach(n => n.rotation.x = (30 + (p.neck ?? 0)) * D);
+}
+
+// ---- the battering ram (RamModel boxes; texture ram.png 128x128) ----
+async function ram() {
+	const t = await tex('/skin/ram.png');
+	const root = new THREE.Group();
+	const T = (p, b, uv) => mbox(p, b, uv, t, 0, 128, 128);
+	T(pivot(root, 0, 24, 0), [-8, -8, -13, 16, 2, 26], [0, 0]);
+	for (const [x, z] of [[-7, -11], [7, -11], [-7, 11], [7, 11]]) T(pivot(root, x, 24, z), [-1, -16, -1, 2, 8, 2], [84, 10]);
+	T(pivot(root, 0, 2, 0, 0, -0.6), [-11, 0, -14, 11, 1, 28], [0, 28]);
+	T(pivot(root, 0, 2, 0, 0, 0.6), [0, 0, -14, 11, 1, 28], [0, 28]);
+	T(pivot(root, 0, 2, 0), [-1, -1, -14, 2, 2, 28], [0, 96]);
+	const log = pivot(root, 0, 12, 0);
+	T(log, [-2, -2, -20, 4, 4, 32], [0, 58]); T(log, [-3, -3, -23, 6, 6, 3], [84, 0]);
+	for (const [x, z] of [[-9, -8], [9, -8], [-9, 8], [9, 8]]) T(pivot(root, x, 20.5, z), [-1, -3.5, -3.5, 2, 7, 7], [84, 26]);
+	return {root};
+}
+
+// ---- poses: degrees; arm/leg x pitches forward (negative) or back (positive), z swings out ----
+function pose(P, p) {
+	const set = (o, v) => { if (o) o.rotation.set((v[0] ?? 0) * D, (v[1] ?? 0) * D, (v[2] ?? 0) * D); };
+	set(P.head, p.head ?? [0, 0, 0]); set(P.body, p.body ?? [0, 0, 0]);
+	set(P.rArm, p.rArm ?? [0, 0, 0]); set(P.lArm, p.lArm ?? [0, 0, 0]);
+	const m = P.kit.mounted;
+	set(P.rLeg, m ? [-70, 0, -12] : p.rLeg ?? [0, 0, 0]); set(P.lLeg, m ? [-70, 0, 12] : p.lLeg ?? [0, 0, 0]);
+	const ri = P.kit.rItem?.[P.poseName] ?? p.rItem;
+	if (P.rItem && ri) P.rItem.rotation.set(...ri.map(a => a * D));
+	if (P.lItem && P.kit.lWorld) {
+		// keep the item at the orientation it has with the arm held out (-90), whatever the arm does
+		const arm = new THREE.Quaternion().setFromEuler(P.lArm.rotation);
+		const aimed = new THREE.Quaternion().setFromEuler(new THREE.Euler(-90 * D, 0, 0)).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...P.kit.lWorld.map(a => a * D))));
+		P.lItem.quaternion.copy(arm.invert().multiply(aimed));
+	} else if (P.lItem && p.lItem) P.lItem.rotation.set(...p.lItem.map(a => a * D));
+	if (P.horse) horsePose(P.horse, HORSE_POSES[P.poseName] ?? {});
+	P.root.rotation.y = (m ? -70 : (p.turn ?? 0)) * D;
+}
+
+const POSES = {
+	idle: {head: [0, -12, 0], rArm: [-8, 0, 4], lArm: [6, 0, -4], rLeg: [0, 0, 3], lLeg: [0, 0, -3], turn: -22, rItem: [48, 90, -45], lItem: [14, 90, -45]},
+	march: {head: [0, -8, 0], rArm: [-40, 0, 0], lArm: [36, 0, 0], rLeg: [30, 0, 0], lLeg: [-30, 0, 0], turn: -62, rItem: [75, 90, -45], lItem: [-16, 90, -45]},
+	attack: {head: [-6, -14, 0], body: [0, -14, 0], rArm: [-125, 0, 8], lArm: [-20, 0, -14], rLeg: [-26, 0, 0], lLeg: [22, 0, 0], turn: -34, rItem: [155, 90, -45]},
+	guard: {head: [0, -16, 0], body: [0, -8, 0], rArm: [-80, 0, 0], lArm: [-62, 0, -10], rLeg: [18, 0, 0], lLeg: [-22, 0, 0], turn: -42, rItem: [140, 90, -45]},
+	victory: {head: [-10, -10, 0], rArm: [-165, 0, 14], lArm: [8, 0, -26], rLeg: [0, 0, 5], lLeg: [0, 0, -5], turn: -18, rItem: [170, 90, -45], lItem: [14, 90, -45]},
+	aim: {head: [0, 32, 0], body: [0, 38, 0], rArm: [-90, 56, 0], lArm: [-90, 0, 0], rLeg: [8, 0, 0], lLeg: [-8, 0, 0], turn: -66, rItem: [170, 90, -45], lItem: [90, 90, -45]},
+};
+const HORSE_POSES = {
+	march: {lf: -35, rh: -35, rf: 35, lh: 35, neck: -4}, attack: {lf: -50, rf: -20, lh: 30, rh: 40, neck: 10}, victory: {lf: -70, rf: -60, lh: 20, rh: 20, neck: 12},
+};
+
+const KITS = {
+	militia: {skin: 'militia', right: {tex: 'diamond_sword'}, shield: true},
+	spearman: {skin: 'spearman', right: {tex: 'diamond_spear', scale: 1.8, grip: [6, 9]}},
+	archer: {skin: 'archer', left: {tex: 'bow', scale: 1.15}, lWorld: [90, 0, -135]},
+	crossbowman: {skin: 'crossbowman', right: {tex: 'crossbow_standby', scale: 1.2}, rItem: {idle: [-40, 90, 135], march: [-40, 90, 135], attack: [0, 90, 135], guard: [0, 90, 135], aim: [0, 90, 135]}},
+	knight: {skin: 'knight', right: {tex: 'iron_sword'}, shield: true},
+	warlord: {skin: 'warlord', right: {tex: 'iron_sword', scale: 1.6}},
+	knight_mounted: {skin: 'knight', right: {tex: 'iron_sword'}, shield: true, mounted: true},
+};
+const POSE_SETS = {
+	militia: ['idle', 'march', 'attack', 'guard', 'victory'], spearman: ['idle', 'march', 'attack', 'guard', 'victory'],
+	archer: ['idle', 'march', 'guard', 'aim'], crossbowman: ['idle', 'march', 'attack', 'guard', 'aim'],
+	knight: ['idle', 'march', 'attack', 'guard', 'victory'], warlord: ['idle', 'march', 'attack', 'guard', 'victory'],
+	knight_mounted: ['idle', 'march', 'attack', 'victory'],
+};
+
+const scene = new THREE.Scene();
+scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+const key = new THREE.DirectionalLight(0xfff0dd, 2.2); key.position.set(-30, 50, 60); scene.add(key);
+const rim = new THREE.DirectionalLight(0x99aaff, 0.9); rim.position.set(40, 20, -40); scene.add(rim);
+const camera = new THREE.PerspectiveCamera(22, W / H, 1, 600);
+const frame = (dist, y, lookY) => { camera.position.set(0, y, dist); camera.lookAt(0, lookY, 0); };
+
+async function save(name) {
+	const blob = await new Promise(r => renderer.domElement.toBlob(r, 'image/png'));
+	await fetch('/save/' + name, {method: 'POST', body: blob});
+}
+
+const params = new URLSearchParams(location.search);
+const only = params.get('units')?.split(',');
+const onlyPoses = params.get('poses')?.split(',');
+const prefix = params.get('prefix') ?? '';
+let n = 0;
+const HUMAN_CAM = [125, 20, 16.5], MOUNT_CAM = [200, 26, 20];
+
+// ---- loops for the animated GIFs: ?anim=dance|turn|gallop&frames=30 ----
+const animMode = params.get('anim');
+if (animMode) {
+	const frames = Number(params.get('frames') ?? 30);
+	const wanted = (only ?? Object.keys(KITS)).filter(u => animMode === 'gallop' ? KITS[u].mounted : !KITS[u].mounted);
+	for (const unit of wanted) {
+		const kit = KITS[unit];
+		const P = await soldier(kit);
+		scene.add(P.root);
+		const cam = kit.mounted ? MOUNT_CAM : HUMAN_CAM;
+		for (let f = 0; f < frames; f++) {
+			const t = f / frames, a = 2 * Math.PI * t;
+			const base = animMode === 'turn' ? POSES.idle : animMode === 'dance' ? POSES.victory : POSES.victory;
+			P.poseName = animMode === 'dance' ? 'victory' : 'idle';
+			let p = {...base};
+			if (animMode === 'dance') {
+				// a jig: arm pumps in opposition, legs kick in turn, the body twists and bobs twice per loop
+				p = {...base,
+					head: [-6, 12 * Math.sin(2 * a), 8 * Math.sin(2 * a)], body: [0, 16 * Math.sin(2 * a), 0],
+					rArm: [0, 0, -(150 - 20 * Math.sin(2 * a))], lArm: [0, 0, 150 + 20 * Math.sin(2 * a)],
+					rLeg: [34 * Math.max(0, Math.sin(2 * a)), 0, 6], lLeg: [34 * Math.max(0, -Math.sin(2 * a)), 0, -6],
+					turn: -20 + 14 * Math.sin(a), rItem: [180, 90, -45], lItem: [14, 90, -45]};
+			}
+			if (animMode === 'turn') p = {...base, turn: -(360 * t)};
+			pose(P, p);
+			if (P.shield) P.shield.visible = animMode !== 'dance';
+			if (animMode === 'dance') P.root.position.y = 2.2 * Math.abs(Math.sin(2 * a));
+			if (animMode === 'gallop') {
+				P.root.rotation.y = -70 * D;
+				const sw = a => 38 * Math.sin(a);
+				horsePose(P.horse, {lf: sw(a), rf: sw(a + 0.45 * Math.PI), lh: sw(a + Math.PI), rh: sw(a + 1.45 * Math.PI), neck: 6 * Math.sin(a)});
+				P.root.position.y = 1.6 * Math.abs(Math.sin(a));
+				P.root.position.y += 0;
+				P.root.rotation.z = 0;
+				P.rider.position.y = 9 + 0.8 * Math.sin(2 * a);
+				P.rArm.rotation.set(-125 * D, 0, 8 * D);
+				if (P.rItem) P.rItem.rotation.set(155 * D, 90 * D, -45 * D);
+			}
+			frame(...cam);
+			renderer.render(scene, camera);
+			log(`anim ${unit} ${animMode} ${f}/${frames}`);
+			await save(`anim-${unit.replace('_', '-')}-${animMode}-${String(f).padStart(2, '0')}`);
+			n++;
+		}
+		scene.remove(P.root);
+	}
+	log(`done: ${n} frames`); document.title = 'done'; throw 0;
+}
+
+async function shoot(name, build, poses, cam, apply) {
+	const P = await build();
+	scene.add(P.root);
+	for (const poseName of poses) {
+		if (onlyPoses && !onlyPoses.includes(poseName)) continue;
+		frame(...cam);
+		P.poseName = poseName;
+		apply(P, poseName);
+		renderer.render(scene, camera);
+		log(`rendering ${name}-${poseName}`);
+		await save(`${prefix}${name}-${poseName}`);
+		n++;
+	}
+	scene.remove(P.root);
+}
+
+if (params.get('itemtest')) {
+	// orientation sweep for a held item: ?itemtest=archer|crossbowman&pose=aim
+	const unit = params.get('itemtest'), poseName = params.get('pose') ?? 'aim', kit = KITS[unit];
+	const hand = unit === 'archer' ? 'lItem' : 'rItem';
+	const P = await soldier(kit); scene.add(P.root); P.poseName = poseName;
+	let i = 0;
+	for (const rx of [90, 0, 180]) for (const roll of [0, 90, 180, 270]) for (const rz of [-45, 45, 135, -135]) {
+		pose(P, POSES[poseName]);
+		P[hand].rotation.set(rx * D, roll * D, rz * D);
+		frame(...HUMAN_CAM); renderer.render(scene, camera);
+		await save(`test-${unit}-${String(i).padStart(2, '0')}_${rx}_${roll}_${rz}`); i++;
+	}
+	log('done test'); document.title = 'done'; throw 0;
+}
+if (!params.get('raiders')) {
+	for (const unit of Object.keys(KITS)) {
+		if (only && !only.includes(unit)) continue;
+		const kit = KITS[unit];
+		await shoot(unit.replace('_', '-'), () => soldier(kit), POSE_SETS[unit], kit.mounted ? MOUNT_CAM : HUMAN_CAM, (P, name) => pose(P, POSES[name]));
+	}
+	if (!only || only.includes('ram')) {
+		await shoot('ram', ram, ['front', 'side', 'back'], [200, 30, 15], (P, name) => { P.root.rotation.y = ({front: -32, side: -88, back: -150})[name] * D; });
+	}
+} else {
+	// each camp's own soldiers, idle and attack, to show who you fight
+	const camps = await (await fetch('/raiders')).json();
+	for (const [camp, units] of Object.entries(camps)) {
+		if (only && !only.includes(camp)) continue;
+		for (const unit of units) {
+			const kit = {...KITS[unit], skin: `raider_${camp === 'default' ? '' : camp + '_'}${unit}`};
+			await shoot(`raider-${camp}-${unit}`, () => soldier(kit), ['idle', 'attack'], HUMAN_CAM, (P, name) => pose(P, POSES[name]));
+		}
+	}
+}
+log(`done: ${n} portraits`);
+document.title = 'done';
+</script></body></html>

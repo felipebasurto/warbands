@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "warbands:block/stable"
+    },
+    "facing=east": {
+      "model": "warbands:block/stable",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "warbands:block/stable",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "warbands:block/stable",
+      "y": 270
+    }
+  }
+}

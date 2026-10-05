@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "warbands:block/powder_keg_top",
+    "side": "warbands:block/powder_keg_side"
+  }
+}

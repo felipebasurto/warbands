@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "id": "warbands:relic_pedestal"
+    },
+    "title": {
+      "translate": "advancements.warbands.relic_collection.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.relic_collection.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "warbands:warlord_slain"
+}

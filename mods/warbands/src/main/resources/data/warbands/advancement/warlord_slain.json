@@ -1,0 +1,26 @@
+{
+  "display": {
+    "icon": {
+      "id": "minecraft:netherite_sword",
+      "components": {
+        "minecraft:item_model": "warbands:warlord_blade"
+      }
+    },
+    "title": {
+      "translate": "advancements.warbands.warlord_slain.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.warlord_slain.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "warbands:camp_keep"
+}

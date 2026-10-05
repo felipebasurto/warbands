@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "S": "minecraft:stone_bricks",
+    "G": "minecraft:gold_ingot",
+    "L": "minecraft:leather"
+  },
+  "pattern": [
+    "S S",
+    "GLG",
+    "S S"
+  ],
+  "result": {
+    "id": "warbands:stable_blueprint"
+  }
+}

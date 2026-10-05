@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "powered=false": {
+      "model": "warbands:block/alarm_horn"
+    },
+    "powered=true": {
+      "model": "warbands:block/alarm_horn"
+    }
+  }
+}

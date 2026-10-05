@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "id": "minecraft:black_banner"
+    },
+    "title": {
+      "translate": "advancements.warbands.camp_bandit.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.camp_bandit.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "warbands:war_map_bought"
+}

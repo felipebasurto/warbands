@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_relic": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": ["warbands:hag_charm", "warbands:frost_sigil", "warbands:grave_lantern", "warbands:omen_banner"]
+          }
+        ]
+      }
+    },
+    "has_the_recipe": {
+      "trigger": "minecraft:recipe_unlocked",
+      "conditions": {
+        "recipe": "warbands:relic_pedestal"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_relic",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "warbands:relic_pedestal"
+    ]
+  }
+}

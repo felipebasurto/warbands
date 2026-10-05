@@ -1,0 +1,52 @@
+{
+  "display": {
+    "icon": {
+      "id": "warbands:handbook"
+    },
+    "title": {
+      "translate": "advancements.warbands.root.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.root.description"
+    },
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false,
+    "background": "minecraft:gui/advancements/backgrounds/stone"
+  },
+  "criteria": {
+    "has_handbook": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "warbands:handbook"
+          }
+        ]
+      }
+    },
+    "has_town_center_blueprint": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "warbands:town_center_blueprint"
+          }
+        ]
+      }
+    }
+  },
+  "rewards": {
+    "recipes": [
+      "warbands:town_center_blueprint",
+      "warbands:handbook"
+    ]
+  },
+  "requirements": [
+    [
+      "has_handbook",
+      "has_town_center_blueprint"
+    ]
+  ]
+}

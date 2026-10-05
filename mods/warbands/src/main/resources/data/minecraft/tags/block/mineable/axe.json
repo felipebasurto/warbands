@@ -1,0 +1,14 @@
+{
+  "replace": false,
+  "values": [
+    "warbands:town_center",
+    "warbands:barracks",
+    "warbands:archery_range",
+    "warbands:stable",
+    "warbands:siege_workshop",
+    "warbands:reinforced_gate",
+    "warbands:weapon_rack",
+    "warbands:hide_rack",
+    "warbands:supply_crate"
+  ]
+}

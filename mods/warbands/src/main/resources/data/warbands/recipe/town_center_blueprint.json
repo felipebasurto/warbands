@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "E": "minecraft:emerald",
+    "G": "minecraft:gold_block",
+    "S": "minecraft:stone_bricks",
+    "M": "minecraft:map",
+    "D": "minecraft:diamond"
+  },
+  "pattern": [
+    "EGE",
+    "SMS",
+    "SDS"
+  ],
+  "result": {
+    "id": "warbands:town_center_blueprint"
+  }
+}

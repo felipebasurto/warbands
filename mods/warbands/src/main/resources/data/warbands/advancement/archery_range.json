@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "id": "warbands:archery_range_blueprint"
+    },
+    "title": {
+      "translate": "advancements.warbands.archery_range.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.archery_range.description"
+    },
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "warbands:feudal_age"
+}

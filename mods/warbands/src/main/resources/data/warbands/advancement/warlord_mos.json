@@ -1,0 +1,26 @@
+{
+  "display": {
+    "icon": {
+      "id": "minecraft:diamond_sword",
+      "components": {
+        "minecraft:item_model": "warbands:mos_gravebane"
+      }
+    },
+    "title": {
+      "translate": "advancements.warbands.warlord_mos.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.warlord_mos.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "warbands:camp_sunken_crypt"
+}

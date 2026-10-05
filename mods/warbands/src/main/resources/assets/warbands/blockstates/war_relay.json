@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "powered=false,pulse=false": {
+      "model": "warbands:block/war_relay"
+    },
+    "powered=false,pulse=true": {
+      "model": "warbands:block/war_relay"
+    },
+    "powered=true,pulse=false": {
+      "model": "warbands:block/war_relay_on"
+    },
+    "powered=true,pulse=true": {
+      "model": "warbands:block/war_relay_on"
+    }
+  }
+}

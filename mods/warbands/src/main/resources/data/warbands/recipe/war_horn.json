@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "G": "minecraft:gold_ingot",
+    "H": "minecraft:goat_horn",
+    "I": "minecraft:iron_ingot"
+  },
+  "pattern": [
+    "G",
+    "H",
+    "I"
+  ],
+  "result": {
+    "id": "warbands:war_horn"
+  }
+}

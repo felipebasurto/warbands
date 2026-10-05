@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " e ",
+    "g g",
+    "sss"
+  ],
+  "key": {
+    "e": "minecraft:emerald",
+    "g": "minecraft:gold_ingot",
+    "s": "minecraft:polished_blackstone"
+  },
+  "result": {
+    "id": "warbands:relic_pedestal"
+  }
+}

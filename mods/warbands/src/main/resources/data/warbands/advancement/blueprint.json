@@ -1,0 +1,30 @@
+{
+  "display": {
+    "icon": {
+      "id": "warbands:town_center_blueprint"
+    },
+    "title": {
+      "translate": "advancements.warbands.blueprint.title"
+    },
+    "description": {
+      "translate": "advancements.warbands.blueprint.description"
+    },
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "has_town_center_blueprint": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "warbands:town_center_blueprint"
+          }
+        ]
+      }
+    }
+  },
+  "parent": "warbands:root"
+}

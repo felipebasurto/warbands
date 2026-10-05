@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "warbands:block/camp_standard_top",
+    "side": "warbands:block/camp_standard_side"
+  }
+}

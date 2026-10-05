@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "S": "minecraft:stone_bricks",
+    "I": "minecraft:iron_ingot",
+    "B": "minecraft:bow"
+  },
+  "pattern": [
+    "S S",
+    "IBI",
+    "S S"
+  ],
+  "result": {
+    "id": "warbands:archery_range_blueprint"
+  }
+}

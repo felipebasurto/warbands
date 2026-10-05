@@ -1,0 +1,35 @@
+{
+	"schemaVersion": 1,
+	"id": "warbands",
+	"version": "${version}",
+	"name": "Warbands",
+	"description": "Build a Town Center, stockpile food, wood, stone and gold, and train soldiers that follow you into battle.",
+	"authors": [
+		"felipebasurto"
+	],
+	"contact": {
+		"homepage": "https://github.com/felipebasurto/warbands",
+		"sources": "https://github.com/felipebasurto/warbands",
+		"issues": "https://github.com/felipebasurto/warbands/issues"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/warbands/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"dev.felipe.warbands.Warbands"
+		],
+		"client": [
+			"dev.felipe.warbands.client.WarbandsClient"
+		]
+	},
+	"mixins": [
+		"warbands.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=${loader_version}",
+		"minecraft": "~${minecraft_version}",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

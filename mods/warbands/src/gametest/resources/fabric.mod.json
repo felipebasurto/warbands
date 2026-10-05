@@ -1,0 +1,13 @@
+{
+	"schemaVersion": 1,
+	"id": "warbands-gametest",
+	"version": "${version}",
+	"name": "Warbands Game Tests",
+	"environment": "*",
+	"entrypoints": {
+		"fabric-client-gametest": ["dev.felipe.warbands.gametest.WarbandsClientGameTest"]
+	},
+	"depends": {
+		"warbands": "*"
+	}
+}

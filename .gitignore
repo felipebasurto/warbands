@@ -1,0 +1,12 @@
+.gradle/
+build/
+run/
+logs/
+out/
+.idea/
+*.iml
+.DS_Store
+__pycache__/
+*.pyc
+.tooling/
+mods/*/publish/

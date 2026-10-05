@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "warbands:block/siege_workshop"
+    },
+    "facing=east": {
+      "model": "warbands:block/siege_workshop",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "warbands:block/siege_workshop",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "warbands:block/siege_workshop",
+      "y": 270
+    }
+  }
+}

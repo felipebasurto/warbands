@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "top": "warbands:block/siege_workshop_top",
+    "front": "warbands:block/siege_workshop_front",
+    "side": "warbands:block/siege_workshop_side"
+  }
+}

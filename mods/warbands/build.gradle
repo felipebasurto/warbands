@@ -1,0 +1,23 @@
+// Warbands-specific build config (shared config lives in the root build.gradle).
+fabricApi {
+	// ./gradlew :warbands:runClientGameTest plays through the core loop in a real
+	// singleplayer world and saves screenshots to build/run/clientGameTest/screenshots/.
+	configureTests {
+		createSourceSet = true
+		modId = "warbands-gametest"
+		enableGameTests = false
+		enableClientGameTests = true
+		eula = false
+	}
+}
+
+// The client-test harness wipes its run directory, so an opt-in bridge jar must live outside it.
+if (providers.gradleProperty('mcpfabric').isPresent()) {
+	def bridge = rootProject.file('.tooling/mcpfabric/mcpfabric-0.5.0+26.1.2.jar')
+	if (!bridge.isFile()) {
+		throw new GradleException('Install the development bridge first: docs/mcpfabric.md')
+	}
+	loom.runConfigs.configureEach {
+		vmArg("-Dfabric.addMods=${bridge.absolutePath}")
+	}
+}

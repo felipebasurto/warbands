@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "ppp",
+    "pnp",
+    "ppp"
+  ],
+  "key": {
+    "p": "#minecraft:planks",
+    "n": "minecraft:iron_nugget"
+  },
+  "result": {
+    "id": "warbands:supply_crate"
+  }
+}
