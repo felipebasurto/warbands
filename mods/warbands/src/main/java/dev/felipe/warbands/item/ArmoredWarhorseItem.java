@@ -68,7 +68,9 @@ public class ArmoredWarhorseItem extends Item {
 		horse.setGuaranteedDrop(EquipmentSlot.SADDLE);
 		horse.setGuaranteedDrop(EquipmentSlot.BODY);
 		horse.setCustomName(Component.translatable("entity.warbands.warhorse"));
-		level.addFreshEntity(horse);
+		if (!level.addFreshEntity(horse)) {
+			return InteractionResult.FAIL;
+		}
 		level.gameEvent(context.getPlayer(), GameEvent.ENTITY_PLACE, pos);
 		arrive(level, horse, context.getPlayer());
 		context.getItemInHand().consume(1, context.getPlayer());

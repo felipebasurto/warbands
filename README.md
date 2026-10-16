@@ -6,14 +6,14 @@ Warbands is built for mid-to-late survival. You start in the Village Age and ear
 
 ## Install
 
-Version 0.1.0 is a beta in preparation. There is no download yet.
+Version 0.2.0 is the second beta. The first one, 0.1.0, was published on [CurseForge](https://www.curseforge.com/minecraft/mc-mods/warbands) on October 8, 2026. See the [changelog](CHANGELOG.md) for what changed.
 
 - Minecraft Java 26.1.2, Java 25 and Fabric Loader 0.19.5 or newer.
 - Fabric API is required. The tested build is 0.155.3+26.1.2.
-- Put `warbands-0.1.0.jar` and the matching Fabric API jar in your profile's `mods` folder. Fabric Loader is installed through the launcher/installer, not copied into that folder.
+- Put `warbands-0.2.0.jar` and the matching Fabric API jar in your profile's `mods` folder. Fabric Loader is installed through the launcher/installer, not copied into that folder.
 - Other Minecraft versions and loaders are not verified. Dedicated-server and two-player validation remain pending.
 
-For a local build, run `./gradlew :warbands:build` from the repository root; the binary is `mods/warbands/build/libs/warbands-0.1.0.jar`. The `-sources.jar` is for developers.
+For a local build, run `./gradlew :warbands:build` from the repository root; the binary is `mods/warbands/build/libs/warbands-0.2.0.jar`. The `-sources.jar` is for developers.
 
 ## First steps
 
@@ -31,4 +31,4 @@ Try the beta in a disposable world and back up any world you care about. Upgradi
 
 [Report a bug](https://github.com/felipebasurto/warbands/issues) with the mod version, Minecraft/Fabric versions, reproduction steps and relevant log or screenshot. [Source code](https://github.com/felipebasurto/warbands) · [Changelog](CHANGELOG.md).
 
-Warbands was built with AI assistance (Claude Code). The project is licensed CC0-1.0. It is an independent Minecraft mod.
+Warbands was built with AI assistance, as documented in the repository's making-of. The project is licensed CC0-1.0. It is an independent Minecraft mod.

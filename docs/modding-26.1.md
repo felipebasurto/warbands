@@ -226,7 +226,8 @@ Creative tabs: `CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.TOOLS_A
   building, not in the same server call. Force a footprint to tick with `level.setChunkForced(cx, cz, true)` +
   `level.getChunk(cx, cz, ChunkStatus.FULL, true)` (ChunkStatus moved to `net.minecraft.world.level.chunk.status`).
 - `Entity.getTags()` is now `entityTags()`; `Mob.setHomeTo(BlockPos, int)` limits wandering; tag a mob and mixin-guard
-  `LivingEntity.dropAllDeathLoot`/`getBaseExperienceReward` to keep it drop- and XP-free.
+  `LivingEntity.dropAllDeathLoot` to keep it drop-free. XP: `Mob` overrides `getBaseExperienceReward`, so a mixin on
+  `LivingEntity` never reaches a mob's XP; target `Mob.getBaseExperienceReward` instead.
 - `MeleeAttackGoal(PathfinderMob, speed, followEvenIfNotSeen)` works for any `PathfinderMob`.
 - `RangedBowAttackGoal<T extends Monster & RangedAttackMob>` rejects non-monsters: **copy it** into your own
   goal (see `warbands/entity/ai/SoldierBowAttackGoal`). Arrows: `ProjectileUtil.getMobArrow(...)` and

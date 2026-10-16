@@ -54,6 +54,8 @@ public class TrainingBlockEntity extends BlockEntity implements MenuProvider {
 	private int reserved;
 	private int link = LINK_NO_TOWN;
 	private boolean blocked;
+	/** Refunds for cancelled units while no Town Center was in reach: paid on the first tick one is. */
+	private final List<UnitType> pendingRefunds = new ArrayList<>();
 	/** Below half its blocks after a raid: training waits until the Town Center repairs it. */
 	private boolean wrecked;
 
@@ -138,6 +140,13 @@ public class TrainingBlockEntity extends BlockEntity implements MenuProvider {
 			}
 		}
 		TownCenterBlockEntity town = linkedTown(level);
+		if (town != null && !pendingRefunds.isEmpty()) {
+			for (UnitType pending : pendingRefunds) {
+				town.refund(pending);
+			}
+			pendingRefunds.clear();
+			setChanged();
+		}
 		syncFrom(level, town);
 		wrecked = BuildingRegistry.isWrecked(level, pos);
 		if (queue.isEmpty()) {
@@ -228,7 +237,8 @@ public class TrainingBlockEntity extends BlockEntity implements MenuProvider {
 		if (town != null) {
 			town.refund(type);
 		} else {
-			player.sendOverlayMessage(Component.translatable("message.warbands.refund_lost"));
+			pendingRefunds.add(type);
+			player.sendOverlayMessage(Component.translatable("message.warbands.refund_pending"));
 		}
 		if (slot == 0) {
 			progress = 0;
@@ -251,6 +261,10 @@ public class TrainingBlockEntity extends BlockEntity implements MenuProvider {
 			town.refund(type);
 		}
 		queue.clear();
+		for (UnitType type : List.copyOf(pendingRefunds)) {
+			town.refund(type);
+		}
+		pendingRefunds.clear();
 	}
 
 	@Override
@@ -273,6 +287,7 @@ public class TrainingBlockEntity extends BlockEntity implements MenuProvider {
 		output.putString("OwnerName", ownerName);
 		output.store("Queue", UnitType.CODEC.listOf(), List.copyOf(queue));
 		output.putInt("Progress", progress);
+		output.store("PendingRefunds", UnitType.CODEC.listOf(), List.copyOf(pendingRefunds));
 	}
 
 	@Override
@@ -283,5 +298,7 @@ public class TrainingBlockEntity extends BlockEntity implements MenuProvider {
 		queue.clear();
 		input.read("Queue", UnitType.CODEC.listOf()).ifPresent(queue::addAll);
 		progress = input.getIntOr("Progress", 0);
+		pendingRefunds.clear();
+		input.read("PendingRefunds", UnitType.CODEC.listOf()).ifPresent(pendingRefunds::addAll);
 	}
 }

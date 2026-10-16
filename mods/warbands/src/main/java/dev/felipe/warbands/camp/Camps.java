@@ -404,13 +404,19 @@ public final class Camps {
 		return Math.abs(pos.getX() - centerX) < limit && Math.abs(pos.getZ() - centerZ) < limit;
 	}
 
+	/** The custom tag on a filled-map War Map, or null for anything else. {@code copyTag} is the only read access. */
+	private static @Nullable CompoundTag mapData(ItemStack stack) {
+		CustomData data = stack.is(Items.FILLED_MAP) ? stack.get(DataComponents.CUSTOM_DATA) : null;
+		return data == null ? null : data.copyTag();
+	}
+
 	/** The camp a War Map points at (its x/z, y 0), or null for any other item or a map whose camp was taken. */
 	public static @Nullable BlockPos mapTarget(ItemStack stack) {
-		CustomData data = stack.get(DataComponents.CUSTOM_DATA);
-		if (data == null || !stack.is(Items.FILLED_MAP) || data.copyTag().contains(HOME_TAG)) {
+		CompoundTag tag = mapData(stack);
+		if (tag == null || tag.contains(HOME_TAG)) {
 			return null;
 		}
-		long packed = data.copyTag().getLongOr(MAP_TAG, Long.MIN_VALUE);
+		long packed = tag.getLongOr(MAP_TAG, Long.MIN_VALUE);
 		return packed == Long.MIN_VALUE ? null : BlockPos.of(packed);
 	}
 
@@ -442,7 +448,11 @@ public final class Camps {
 				// at the edge of view, where guards would freeze and the clearing would load chunks on the spot.
 				if (!camp.abandoned() && playerNear(level, camp.center())
 						&& Ground.ready(level, camp.center(), camp.layout().half() + APPROACH_LANE + 1)) {
-					build(level, camp);
+					if (playerBlocked(level, camp)) {
+						refuseSite(level, camp);
+					} else {
+						build(level, camp);
+					}
 				}
 			} else if (!camp.conquered()) {
 				tickStanding(level, camp);
@@ -747,6 +757,45 @@ public final class Camps {
 	}
 
 	/**
+	 * Whether the camp's space holds a block entity (a chest, furnace, sign...) that a player built: the clearing would
+	 * destroy it. Natural ground, trees and plants never have one, so they still get cleared.
+	 */
+	private static boolean playerBlocked(ServerLevel level, Camp camp) {
+		int ground = Ground.footprint(level, camp.center(), camp.layout().half());
+		if (ground == Integer.MIN_VALUE) {
+			return false;
+		}
+		int half = camp.layout().half();
+		BlockPos base = new BlockPos(camp.center().getX(), ground - camp.layout().sink(), camp.center().getZ());
+		for (BlockPos pos : BlockPos.betweenClosed(base.offset(-half, 0, -half), base.offset(half, camp.layout().height() - 1, half))) {
+			if (level.getBlockState(pos).hasBlockEntity()) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * The camp can't be built on this spot: it is forgotten and the map's cost goes back to the Town Center that sold
+	 * it. That Town Center is usually far away, so its chunk is loaded for the one refund.
+	 */
+	private static void refuseSite(ServerLevel level, Camp camp) {
+		level.getChunk(camp.town().getX() >> 4, camp.town().getZ() >> 4);
+		if (level.getBlockEntity(camp.town()) instanceof TownCenterBlockEntity center) {
+			for (Resource resource : Resource.values()) {
+				center.addStock(resource, camp.tier().cost(resource));
+			}
+		}
+		// The town may be gone, but the camp must still be forgotten: keeping it would bar the owner from ever
+		// buying another War Map (the registry still counts it as the active camp).
+		CampRegistry.remove(level, camp);
+		if (level.getPlayerByUUID(camp.owner()) instanceof Player owner) {
+			owner.sendSystemMessage(Component.translatable("message.warbands.camp_site_blocked", camp.tier().displayName())
+					.withStyle(ChatFormatting.GOLD));
+		}
+	}
+
+	/**
 	 * Builds the camp on today's real ground and stations its guards. The tick calls it once the area is ready
 	 * ({@link Ground#ready}); the game test calls it directly after force-loading the chunks.
 	 */
@@ -816,6 +865,7 @@ public final class Camps {
 			if (!level.addFreshEntity(mob)) {
 				Warbands.LOGGER.warn("camp {} guard {} at {} was not added to the world", layout.id(),
 						guard.type().toShortString(), spot.toShortString());
+				continue; // a guard that never spawned can't die: listing it would keep the camp unconquerable
 			}
 			guards.add(mob.getUUID());
 		}
@@ -992,11 +1042,15 @@ public final class Camps {
 
 	/** Death bookkeeping: takes the fallen guard off its camp's list, whatever dimension it died in. */
 	public static void guardDied(LivingEntity entity) {
-		if (!(entity.level() instanceof ServerLevel here)) {
+		// Guards are mobs; everything else (animals, armor stands, projectiles...) skips the camp scan entirely.
+		if (!(entity.level() instanceof ServerLevel here) || !(entity instanceof Mob)) {
 			return;
 		}
 		UUID id = entity.getUUID();
 		for (ServerLevel level : here.getServer().getAllLevels()) {
+			if (CampRegistry.all(level).isEmpty()) {
+				continue;
+			}
 			for (Camp camp : List.copyOf(CampRegistry.all(level))) {
 				if (camp.guards().contains(id)) {
 					CampRegistry.replace(level, camp, camp.withoutGuard(id));
@@ -1154,18 +1208,19 @@ public final class Camps {
 
 	/** The Town Center a taken camp's War Map leads back to, or null. */
 	public static @Nullable BlockPos mapHome(ItemStack stack) {
-		CustomData data = stack.get(DataComponents.CUSTOM_DATA);
-		if (data == null || !stack.is(Items.FILLED_MAP)) {
+		CompoundTag tag = mapData(stack);
+		if (tag == null) {
 			return null;
 		}
-		long packed = data.copyTag().getLongOr(HOME_TAG, Long.MIN_VALUE);
+		long packed = tag.getLongOr(HOME_TAG, Long.MIN_VALUE);
 		return packed == Long.MIN_VALUE ? null : BlockPos.of(packed);
 	}
 
 	/** Whether the player holds a War Map (to a camp, or home from a taken one). */
 	private static boolean holdsWarMap(Player player) {
 		for (ItemStack stack : List.of(player.getMainHandItem(), player.getOffhandItem())) {
-			if (mapTarget(stack) != null || mapHome(stack) != null) {
+			CompoundTag tag = mapData(stack);
+			if (tag != null && (tag.contains(HOME_TAG) || tag.contains(MAP_TAG))) {
 				return true;
 			}
 		}
@@ -1175,12 +1230,17 @@ public final class Camps {
 	/** "Raider Fort · 58 blocks ↗" while a War Map is held; the arrow is relative to where the player looks. */
 	public static Component hint(ServerLevel level, Player player) {
 		for (ItemStack stack : List.of(player.getMainHandItem(), player.getOffhandItem())) {
-			BlockPos home = mapHome(stack);
-			if (home != null) {
-				return Component.translatable("message.warbands.war_map_home_hint",
-						Directions.distance(player.blockPosition(), home), Directions.arrow(player, home));
+			CompoundTag tag = mapData(stack);
+			if (tag == null) {
+				continue;
 			}
-			if (mapTarget(stack) != null) {
+			long home = tag.getLongOr(HOME_TAG, Long.MIN_VALUE);
+			if (home != Long.MIN_VALUE) {
+				BlockPos pos = BlockPos.of(home);
+				return Component.translatable("message.warbands.war_map_home_hint",
+						Directions.distance(player.blockPosition(), pos), Directions.arrow(player, pos));
+			}
+			if (tag.contains(MAP_TAG)) {
 				break;
 			}
 		}

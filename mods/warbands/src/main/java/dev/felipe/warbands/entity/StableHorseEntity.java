@@ -2,6 +2,7 @@ package dev.felipe.warbands.entity;
 
 import dev.felipe.warbands.registry.ModBlocks;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -23,6 +24,7 @@ import org.jspecify.annotations.Nullable;
  */
 public class StableHorseEntity extends Horse {
 	private @Nullable BlockPos anchor;
+	private int lastHintTick = -100;
 
 	public StableHorseEntity(EntityType<? extends StableHorseEntity> type, Level level) {
 		super(type, level);
@@ -51,6 +53,11 @@ public class StableHorseEntity extends Horse {
 
 	@Override
 	public InteractionResult mobInteract(Player player, InteractionHand hand) {
+		// It looks like any horse, so say why it can't be saddled or ridden (throttled: click spam is easy).
+		if (this.level() instanceof ServerLevel && this.tickCount - this.lastHintTick > 60) {
+			this.lastHintTick = this.tickCount;
+			player.sendOverlayMessage(Component.translatable("message.warbands.stable_horse_scenery"));
+		}
 		return InteractionResult.PASS;
 	}
 

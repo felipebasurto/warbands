@@ -101,6 +101,8 @@ public abstract class SoldierEntity extends TamableAnimal {
 	private @Nullable BlockPos marchTarget;
 	private @Nullable BlockPos raidTown;
 	private boolean posted;
+	/** Sent back to Follow by its tower: the army's standing order waits for the next horn call. */
+	private boolean releasedFromPost;
 	private @Nullable BlockPos postedTower;
 	private @Nullable BlockPos postSpot;
 	/** A fresh recruit waits here, outside the building that trained it, until its commander comes or blows the horn. */
@@ -387,7 +389,7 @@ public abstract class SoldierEntity extends TamableAnimal {
 	 */
 	public void followArmyOrder(ServerLevel level) {
 		UUID owner = ownerId();
-		if (isRaider() || this.posted || owner == null) {
+		if (isRaider() || this.posted || this.releasedFromPost || owner == null) {
 			return;
 		}
 		Stance order = ArmyOrders.get(level.getServer(), owner);
@@ -413,9 +415,16 @@ public abstract class SoldierEntity extends TamableAnimal {
 		}
 	}
 
+	/** A tower lets go of this soldier: it follows its commander until the next horn order. */
+	public void releaseFromPost() {
+		command(Stance.FOLLOW);
+		this.releasedFromPost = true;
+	}
+
 	/** Applies an order. Hold guards the block the soldier is standing on. A horn order leaves the tower. */
 	public void command(Stance stance) {
 		this.posted = false;
+		this.releasedFromPost = false;
 		this.postedTower = null;
 		this.postSpot = null;
 		this.entityData.set(DATA_STANCE, stance.ordinal());
@@ -435,6 +444,7 @@ public abstract class SoldierEntity extends TamableAnimal {
 		super.addAdditionalSaveData(output);
 		output.putString("Stance", this.stance().serializedName());
 		output.putBoolean("Posted", posted);
+		output.putBoolean("ReleasedFromPost", releasedFromPost);
 		output.storeNullable("PostedTower", BlockPos.CODEC, postedTower);
 		output.storeNullable("PostSpot", BlockPos.CODEC, postSpot);
 		output.putString("GearAge", this.gearAge.serializedName());
@@ -455,6 +465,7 @@ public abstract class SoldierEntity extends TamableAnimal {
 		this.raidTown = input.read("RaidTown", BlockPos.CODEC).orElse(null);
 		Stance stance = Stance.byName(input.getStringOr("Stance", Stance.FOLLOW.serializedName()));
 		this.posted = input.getBooleanOr("Posted", false);
+		this.releasedFromPost = input.getBooleanOr("ReleasedFromPost", false);
 		this.postedTower = input.read("PostedTower", BlockPos.CODEC).orElse(null);
 		this.postSpot = input.read("PostSpot", BlockPos.CODEC).orElse(null);
 		if (this.posted && this.postedTower == null && !isRaider()) {

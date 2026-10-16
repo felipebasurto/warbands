@@ -226,8 +226,7 @@ public final class Handbook {
 					new Page("siege_workshop", Grid.of(ModItems.SIEGE_WORKSHOP_BLUEPRINT, new String[] {"S S", "ILI", "S S"},
 							'S', Items.STONE_BRICKS, 'I', Items.IRON_INGOT, 'L', Items.OAK_LOG)),
 					new Page("ram", Icons.of(Layout.ROW, ModItems.BATTERING_RAM, Items.OAK_DOOR, ModItems.WAR_HORN)
-							.captioned(UnitType.RAM.displayName(), caption("smashes"), Stance.CHARGE.displayName())),
-					new Page("14", Icons.of(Layout.ROW, Items.IRON_HOE, Items.EXPERIENCE_BOTTLE, Items.RED_BANNER)));
+							.captioned(UnitType.RAM.displayName(), caption("smashes"), Stance.CHARGE.displayName())));
 		}
 		return pages;
 	}

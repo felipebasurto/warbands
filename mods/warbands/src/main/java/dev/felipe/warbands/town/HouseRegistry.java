@@ -91,6 +91,7 @@ public final class HouseRegistry {
 		if (house.blocks() <= 0) {
 			return true;
 		}
-		return StructureBlocks.countIn(level, house.min(), house.max()) >= house.blocks() * MIN_INTACT;
+		int needed = (int) Math.ceil(house.blocks() * MIN_INTACT);
+		return StructureBlocks.countIn(level, house.min(), house.max(), needed) >= needed;
 	}
 }

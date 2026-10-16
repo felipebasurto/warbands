@@ -49,6 +49,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Rotation;
@@ -74,6 +75,8 @@ final class CampScenarios {
 				CampScenarios::keep));
 		all.add(new Scenario("camps.abandon", "abandoning a camp: an unbuilt one is forgotten, a built one stays and can still be taken; a new map can be bought",
 				CampScenarios::abandon));
+		all.add(new Scenario("camps.keeps-player-builds", "a player's chest in a camp's footprint: the camp is dropped when the player arrives, the map's cost comes back, the chest survives",
+				CampScenarios::keepsPlayerBuilds));
 		all.add(new Scenario("camps.revenge-off", "taking a Fort with raids turned off schedules no revenge raid", CampScenarios::revengeOff));
 		all.add(new Scenario("camps.kinds", "every camp kind builds, keeps its guards (vanilla ones too: persistent, no drops), one of each per bag cycle (photos)",
 				CampScenarios::kinds));
@@ -383,6 +386,34 @@ final class CampScenarios {
 		run.tp(first.getX() + 0.5, first.getY() + 10, first.getZ() + 20.5, 180.0F, 30.0F);
 		run.holds(server -> server.overworld().getEntitiesOfClass(SoldierEntity.class, new AABB(first).inflate(20), SoldierEntity::isRaider).isEmpty(),
 				"an abandoned camp that was never built never appears", 100);
+	}
+
+	private static void keepsPlayerBuilds(Run run) {
+		Run.Town town = run.placeTown();
+		BlockPos core = town.core();
+		run.stockUp(core);
+		BlockPos[] spot = new BlockPos[1];
+		int[] food = new int[1];
+		run.server(server -> {
+			ServerLevel level = server.overworld();
+			ServerPlayer player = player(server);
+			food[0] = townCenter(level, core).stock(Resource.FOOD);
+			check(Camps.buy(level, townCenter(level, core), player, CampTier.BANDIT_CAMP), "a War Map is bought");
+			BlockPos site = active(server).center();
+			level.getChunk(site.getX() >> 4, site.getZ() >> 4);
+			BlockPos chest = site.atY(level.getHeight(Heightmap.Types.WORLD_SURFACE, site.getX(), site.getZ()) + 1);
+			level.setBlock(chest, Blocks.CHEST.defaultBlockState(), 3);
+			spot[0] = chest;
+		});
+		run.tp(spot[0].getX() + 0.5, spot[0].getY() + 20, spot[0].getZ() + 40.5, 180.0F, 30.0F);
+		run.waitFor(server -> CampRegistry.active(server.overworld(), player(server).getUUID()).isEmpty(),
+				"a camp with a player's chest in its footprint is dropped", 20 * 30);
+		run.server(server -> {
+			ServerLevel level = server.overworld();
+			check(level.getBlockState(spot[0]).is(Blocks.CHEST), "the player's chest survives");
+			check(townCenter(level, core).stock(Resource.FOOD) == food[0], "the map's cost goes back to the Town Center");
+			check(CampRegistry.all(level).stream().noneMatch(c -> c.built() && c.center().getX() == spot[0].getX()), "no camp was built there");
+		});
 	}
 
 	private static void revengeOff(Run run) {

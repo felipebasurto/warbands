@@ -33,7 +33,11 @@ public final class SoldierSpawner {
 		soldier.finalizeSpawn(level, level.getCurrentDifficultyAt(spot), EntitySpawnReason.MOB_SUMMONED, null);
 		soldier.assignOwner(owner, ownerName);
 		soldier.muster(spot);
-		level.addFreshEntity(soldier);
+		if (!level.addFreshEntity(soldier)) {
+			// Refused by the world: roll back its army count and let the queue try again, so the cost isn't lost.
+			soldier.discard();
+			return false;
+		}
 		WarbandsAdvancements.award(level.getServer(), owner, advancement(type));
 		if (ArmyRegistry.count(level.getServer(), owner) >= 10) {
 			WarbandsAdvancements.award(level.getServer(), owner, WarbandsAdvancements.WARBAND);

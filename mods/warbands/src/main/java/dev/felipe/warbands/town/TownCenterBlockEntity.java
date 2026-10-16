@@ -91,6 +91,8 @@ public class TownCenterBlockEntity extends BlockEntity implements MenuProvider {
 	private int researchTotal;
 	private int otherQueues;
 	private int missingBlocks;
+	/** Missing blocks are only recounted while the menu asks: each count replays every building's structure file. */
+	private long missingBlocksAt = -1000;
 	/** Blocks a Repair still has to put back (not saved: a restart just stops it, unpaid). */
 	private @Nullable ArrayDeque<Repairs.Missing> repairJob;
 	private int repairPlaced;
@@ -126,7 +128,7 @@ public class TownCenterBlockEntity extends BlockEntity implements MenuProvider {
 				case DATA_RESEARCH -> researchProgress;
 				case DATA_RESEARCH_TOTAL -> researchTotal;
 				case DATA_OTHER_QUEUES -> otherQueues;
-				case DATA_REPAIR -> missingBlocks;
+				case DATA_REPAIR -> missingBlocks();
 				case DATA_RAID -> raided ? 1 : 0;
 				case DATA_CAMP -> campActive ? 1 : 0;
 				case DATA_NEXT_RAID -> nextRaidDays;
@@ -181,10 +183,6 @@ public class TownCenterBlockEntity extends BlockEntity implements MenuProvider {
 			Camps.payOut(level, pos);
 			this.campActive = owner != null && CampRegistry.active(level, owner).isPresent();
 		}
-		if (level.getGameTime() % 100 == 0) {
-			// Every 5 s: comparing every building with its structure file is the costliest check here.
-			this.missingBlocks = Repairs.missingAround(level, this);
-		}
 		tickQueue(level, pos, state);
 		tickResearch(level, pos, state);
 		tickRepair(level);
@@ -216,6 +214,18 @@ public class TownCenterBlockEntity extends BlockEntity implements MenuProvider {
 			completeResearch(level, pos, state);
 		}
 		setChanged();
+	}
+
+	/**
+	 * Blocks missing from the owner's buildings, recounted at most every 5 s and only when a menu reads it
+	 * ({@link #data} is asked while the Town Center screen is open). Nobody watching means nobody to see the number.
+	 */
+	private int missingBlocks() {
+		if (this.level instanceof ServerLevel level && level.getGameTime() - this.missingBlocksAt >= 100) {
+			this.missingBlocks = Repairs.missingAround(level, this);
+			this.missingBlocksAt = level.getGameTime();
+		}
+		return this.missingBlocks;
 	}
 
 	public Age age() {
@@ -336,6 +346,7 @@ public class TownCenterBlockEntity extends BlockEntity implements MenuProvider {
 		}
 		List<Repairs.Missing> missing = Repairs.collectAround(level, this);
 		this.missingBlocks = missing.size();
+		this.missingBlocksAt = level.getGameTime();
 		if (missing.isEmpty()) {
 			player.sendOverlayMessage(Component.translatable("message.warbands.repair_nothing"));
 			return false;
@@ -408,6 +419,7 @@ public class TownCenterBlockEntity extends BlockEntity implements MenuProvider {
 		this.repairPlaced = 0;
 		this.repairPlayer = null;
 		this.missingBlocks = Repairs.missingAround(level, this);
+		this.missingBlocksAt = level.getGameTime();
 		refreshPopulation(level);
 		ServerPlayer player = who == null ? null : level.getServer().getPlayerList().getPlayer(who);
 		if (player == null) {

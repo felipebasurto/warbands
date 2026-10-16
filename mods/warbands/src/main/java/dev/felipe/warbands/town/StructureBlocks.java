@@ -43,11 +43,25 @@ public final class StructureBlocks {
 
 	/** How many protected positions are inside the box from {@code min} to {@code max}. */
 	public static int countIn(ServerLevel level, BlockPos min, BlockPos max) {
+		return countIn(level, min, max, Integer.MAX_VALUE);
+	}
+
+	/**
+	 * As {@link #countIn}, but stops once the comparison with {@code stopAt} is settled: when {@code stopAt} positions
+	 * are found, or when the positions left in the box can no longer reach it. A return value {@code >= stopAt} means
+	 * the real count is {@code >= stopAt}; below it means the real count is below it too. Callers that only ask
+	 * "are at least N still there" pass N and leave early on a standing or a hopeless building.
+	 */
+	public static int countIn(ServerLevel level, BlockPos min, BlockPos max, int stopAt) {
 		LongSet set = data(level).positions;
+		long left = (long) (max.getX() - min.getX() + 1) * (max.getY() - min.getY() + 1) * (max.getZ() - min.getZ() + 1);
 		int count = 0;
 		for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
-			if (set.contains(pos.asLong())) {
-				count++;
+			if (set.contains(pos.asLong()) && ++count >= stopAt) {
+				return count;
+			}
+			if (stopAt < Integer.MAX_VALUE && --left + count < stopAt) {
+				return count;
 			}
 		}
 		return count;

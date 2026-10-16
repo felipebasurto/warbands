@@ -127,6 +127,15 @@ public final class Raids {
 			return;
 		}
 		TownRaids raids = saved.get();
+		if (!raids.owner().equals(town.owner())) {
+			// The Town Center changed hands (rebuilt by someone else): the record's owner would never be near, so its
+			// raids could never fire. Start a clean calendar; an old active raid ends with its raiders going home.
+			raids.active().ifPresent(active -> discardRaiders(level, active));
+			removeBar(level, raids.town());
+			raids = new TownRaids(town.pos(), town.owner(), now + FIRST_DELAY, 0, false, Optional.empty());
+			RaidRegistry.put(level, raids);
+			return;
+		}
 		if (raids.active().isPresent()) {
 			tickActive(level, raids, raids.active().get(), center, now);
 			return;

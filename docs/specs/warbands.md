@@ -1148,3 +1148,11 @@ vanilla frames from the Loom jar). Not verified in game: the drops, the bow pull
 - Added source/homepage/issues metadata, a dedicated player README and initial unreleased changelog. Updated the collection status without rewriting yesterday's historical findings. Publishing, platform eligibility, clean installation, normal survival progression, old-world compatibility and multiplayer validation are separate tasks.
 
 - **Verification:** original extended cleanup regression fails (apples gone); after the fix, cleanup, placement, gallery and EN/ES body fit pass. New terrain regression passes after correcting its approach fixture to natural dirt/grass, matching the intended protection of cultivated crops. Independently checked all 37 rendered guide margins (zero failures) and reviewed the four changed pages at full size. Build and refreshed collected jar pass; no registration changes, so no separate datagen run.
+
+## Implementation notes (0.2.0 fixes, 2026-10-16)
+
+- Camp site with a player's block entity in its volume (chest, furnace, sign...): the camp is dropped at build time and the map's cost goes back to its Town Center (loaded for the refund). Plain player walls without a block entity are still cleared (known limit).
+- Watch Tower recall and tower removal call `SoldierEntity.releaseFromPost()`: Follow until the next horn order (`ReleasedFromPost`).
+- Barracks cancel without a Town Center stores the refund (`PendingRefunds`) and pays it on the first tick the Town Center is in reach.
+- Camp guard XP is blocked by `CampGuardExperienceMixin` (targets `Mob`, which overrides `getBaseExperienceReward`).
+- Handbook page "Still to Come" removed. Game test `camps.keeps-player-builds` added.

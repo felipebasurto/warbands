@@ -102,6 +102,9 @@ public final class BuildingRegistry {
 	 * working until it's repaired at the Town Center. Buildings from before the registry are never wrecked.
 	 */
 	public static boolean isWrecked(ServerLevel level, BlockPos core) {
-		return at(level, core).map(b -> StructureBlocks.countIn(level, b.min(), b.max()) * 2 < b.blocks()).orElse(false);
+		return at(level, core).map(b -> {
+			int standing = (b.blocks() + 1) / 2;
+			return StructureBlocks.countIn(level, b.min(), b.max(), standing) < standing;
+		}).orElse(false);
 	}
 }

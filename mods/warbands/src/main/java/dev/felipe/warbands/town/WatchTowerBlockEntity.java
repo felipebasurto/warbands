@@ -2,7 +2,6 @@ package dev.felipe.warbands.town;
 
 import dev.felipe.warbands.WarbandsAdvancements;
 import dev.felipe.warbands.entity.SoldierEntity;
-import dev.felipe.warbands.entity.Stance;
 import dev.felipe.warbands.registry.ModBlockEntities;
 import java.util.Comparator;
 import java.util.List;
@@ -150,7 +149,7 @@ public class WatchTowerBlockEntity extends BlockEntity implements MenuProvider {
 			return false;
 		}
 		for (SoldierEntity soldier : posted) {
-			soldier.command(Stance.FOLLOW);
+			soldier.releaseFromPost();
 		}
 		menuValuesTime = -1000L;
 		return true;
@@ -159,7 +158,7 @@ public class WatchTowerBlockEntity extends BlockEntity implements MenuProvider {
 	/** Sends posted soldiers back to Follow when the tower is removed. */
 	public void releasePosted() {
 		for (SoldierEntity soldier : posted()) {
-			soldier.command(Stance.FOLLOW);
+			soldier.releaseFromPost();
 		}
 	}
 
