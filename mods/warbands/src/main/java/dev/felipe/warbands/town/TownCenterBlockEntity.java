@@ -118,7 +118,7 @@ public class TownCenterBlockEntity extends BlockEntity implements MenuProvider {
 				return slot < queue.size() ? queue.get(slot).ordinal() + 1 : 0;
 			}
 			return switch (index) {
-				case DATA_POPULATION -> population;
+				case DATA_POPULATION -> populationCount();
 				case DATA_CAP -> populationCap;
 				case DATA_HOUSES -> Math.max(0, houses);
 				case DATA_PROGRESS -> progress;
@@ -194,7 +194,7 @@ public class TownCenterBlockEntity extends BlockEntity implements MenuProvider {
 			blocked = false;
 			return;
 		}
-		blocked = population >= populationCap;
+		blocked = ArmyCount.atCap(populationCount(), 0, populationCap);
 		if (blocked) {
 			return;
 		}
@@ -296,7 +296,16 @@ public class TownCenterBlockEntity extends BlockEntity implements MenuProvider {
 		return queue.size();
 	}
 
+	/**
+	 * Soldiers already in the army. The cache starts at 0 and is not saved; the first read copies the army registry
+	 * ({@code houses} stays -1 until then), so a loaded town does not train as if nobody were enlisted.
+	 */
 	public int populationCount() {
+		if (houses < 0 && this.level instanceof ServerLevel serverLevel) {
+			int registered = owner == null ? 0 : ArmyRegistry.count(serverLevel.getServer(), owner);
+			refreshPopulation(serverLevel);
+			return ArmyCount.living(houses >= 0, population, registered);
+		}
 		return population;
 	}
 
@@ -496,7 +505,7 @@ public class TownCenterBlockEntity extends BlockEntity implements MenuProvider {
 		if (queue.size() >= MAX_QUEUE || !canAfford(type) || !age.atLeast(type.requiredAge())) {
 			return false;
 		}
-		if (population + queue.size() + otherQueues >= populationCap) {
+		if (ArmyCount.atCap(populationCount(), queue.size() + otherQueues, populationCap)) {
 			player.sendOverlayMessage(Component.translatable("message.warbands.need_houses"));
 			return false;
 		}
