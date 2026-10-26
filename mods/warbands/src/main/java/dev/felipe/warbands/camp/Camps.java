@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -122,12 +123,18 @@ public final class Camps {
 	private static final Map<String, Long> ALARMS = new HashMap<>();
 	/** Camps already told that a block entity is holding them. Not saved: a restart may say it once more. */
 	private static final Set<String> HELD_SITES = new HashSet<>();
+	/**
+	 * Camps moved while their owner was not in this level: new-site key to the old center, so the notice and the map
+	 * update still happen once. Not saved.
+	 */
+	private static final Map<String, Long> MOVED_FROM = new HashMap<>();
 
 	/** Forgets burns and alarms of a world that has closed (statics outlive a singleplayer world in one session). */
 	public static void clearState() {
 		BURNS.clear();
 		ALARMS.clear();
 		HELD_SITES.clear();
+		MOVED_FROM.clear();
 	}
 	/** A camp stays alarmed (its war relays powered) this long after the last alarm or sighting. */
 	private static final int ALARM_HOLD = 60 * 20;
@@ -281,8 +288,6 @@ public final class Camps {
 	}
 
 	private static @Nullable BlockPos findSite(ServerLevel level, BlockPos town, int min, int max, @Nullable CampTier kind) {
-		ChunkGenerator generator = level.getChunkSource().getGenerator();
-		int sea = generator.getSeaLevel();
 		double start = level.getRandom().nextDouble() * Math.PI * 2;
 		// A biome-matched search tries more angles and rings before giving up.
 		int attempts = kind != null ? 48 : 24;
@@ -291,19 +296,48 @@ public final class Camps {
 			int distance = min + level.getRandom().nextInt(max - min + 1);
 			int x = town.getX() + Mth.floor(Math.cos(angle) * distance);
 			int z = town.getZ() + Mth.floor(Math.sin(angle) * distance);
-			if (crowded(level, town, x, z)) {
-				continue;
+			BlockPos site = trySite(level, town, x, z, kind, null);
+			if (site != null) {
+				return site;
 			}
-			int surface = generator.getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, level, level.getChunkSource().randomState());
-			if (kind != null && !kind.prefers(generator.getBiomeSource().getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(surface),
-					QuartPos.fromBlock(z), level.getChunkSource().randomState().sampler()))) {
-				continue; // the biome test is cheap: the terrain probes below are not
+		}
+		return null;
+	}
+
+	/**
+	 * A column a new War Map would accept, or null. {@code ignore} is a camp being moved, so its own footprint does not
+	 * count as crowding. Terrain only: a block entity on a loaded column is checked by the caller.
+	 */
+	private static @Nullable BlockPos trySite(ServerLevel level, BlockPos town, int x, int z, @Nullable CampTier kind,
+			@Nullable Camp ignore) {
+		if (crowded(level, town, x, z, ignore)) {
+			return null;
+		}
+		ChunkGenerator generator = level.getChunkSource().getGenerator();
+		int surface = generator.getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, level, level.getChunkSource().randomState());
+		if (kind != null && !kind.prefers(generator.getBiomeSource().getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(surface),
+				QuartPos.fromBlock(z), level.getChunkSource().randomState().sampler()))) {
+			return null; // the biome test is cheap: the terrain probes below are not
+		}
+		int floor = generator.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, level.getChunkSource().randomState());
+		if (unsuitable(level, generator, x, z, surface, floor, kind)) {
+			return null;
+		}
+		return new BlockPos(x, surface, z);
+	}
+
+	/**
+	 * The nearest spot {@link #trySite} accepts around a blocked camp, outside its footprint and within
+	 * {@link CampRelocation#RADIUS}. Null when the search finds nothing: the camp then waits where it is.
+	 */
+	private static @Nullable BlockPos relocateSite(ServerLevel level, Camp camp) {
+		CampTier kind = camp.tier().hasBiomeHome() ? camp.tier() : null;
+		BlockPos from = camp.center();
+		for (CampRelocation.Offset offset : CampRelocation.offsets(camp.layout().half())) {
+			BlockPos site = trySite(level, camp.town(), from.getX() + offset.dx(), from.getZ() + offset.dz(), kind, camp);
+			if (site != null && !footprintBlocked(level, site, camp.layout())) {
+				return site;
 			}
-			int floor = generator.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, level.getChunkSource().randomState());
-			if (unsuitable(level, generator, x, z, surface, floor, kind)) {
-				continue;
-			}
-			return new BlockPos(x, surface, z);
 		}
 		return null;
 	}
@@ -353,10 +387,13 @@ public final class Camps {
 		return false;
 	}
 
-	/** Too close to a camp (standing, taken or burnt) or to someone else's Town Center. */
-	private static boolean crowded(ServerLevel level, BlockPos town, int x, int z) {
+	/** Too close to a camp (standing, taken or burnt) or to someone else's Town Center. {@code ignore} is not crowded by itself. */
+	private static boolean crowded(ServerLevel level, BlockPos town, int x, int z, @Nullable Camp ignore) {
 		BlockPos spot = new BlockPos(x, 0, z);
 		for (Camp camp : CampRegistry.all(level)) {
+			if (ignore != null && ignore.owner().equals(camp.owner()) && ignore.center().equals(camp.center())) {
+				continue;
+			}
 			if (Directions.distance(camp.center(), spot) < CAMP_SPACING) {
 				return true;
 			}
@@ -448,14 +485,19 @@ public final class Camps {
 		if (now % CHECK_INTERVAL != 0) {
 			return;
 		}
+		deliverMoves(level);
 		for (Camp camp : List.copyOf(CampRegistry.all(level))) {
 			if (!camp.built()) {
 				// Only once every chunk of the footprint and its approach is loaded and ticking: isLoaded alone is also true
 				// at the edge of view, where guards would freeze and the clearing would load chunks on the spot.
 				if (!camp.abandoned() && playerNear(level, camp.center())
 						&& Ground.ready(level, camp.center(), camp.layout().half() + APPROACH_LANE + 1)) {
-					switch (CampArrival.decide(playerBlocked(level, camp))) {
+					boolean blocked = playerBlocked(level, camp);
+					// A failed search is remembered, so standing on the chest does not re-probe the terrain every check.
+					BlockPos next = blocked && !HELD_SITES.contains(heldKey(level, camp)) ? relocateSite(level, camp) : null;
+					switch (CampArrival.decide(blocked, next != null)) {
 						case BUILD -> build(level, camp);
+						case RELOCATE -> relocate(level, camp, Objects.requireNonNull(next));
 						case HOLD -> holdSite(level, camp);
 					}
 				}
@@ -463,6 +505,7 @@ public final class Camps {
 				tickStanding(level, camp);
 			}
 		}
+		pruneHeld(level);
 	}
 
 	/**
@@ -776,16 +819,21 @@ public final class Camps {
 
 	/**
 	 * Whether the camp's space holds a block entity (a chest, furnace, sign...) that a player built: building would
-	 * destroy it, so the camp waits. Natural ground, trees and plants never have one, so they still get cleared.
+	 * destroy it. Natural ground, trees and plants never have one, so they still get cleared. An unloaded column is
+	 * not blocked: the camp is only moved off a footprint the game can actually see.
 	 */
 	private static boolean playerBlocked(ServerLevel level, Camp camp) {
-		int ground = Ground.footprint(level, camp.center(), camp.layout().half());
+		return footprintBlocked(level, camp.center(), camp.layout());
+	}
+
+	private static boolean footprintBlocked(ServerLevel level, BlockPos center, CampLayout layout) {
+		int ground = Ground.footprint(level, center, layout.half());
 		if (ground == Integer.MIN_VALUE) {
 			return false;
 		}
-		int half = camp.layout().half();
-		BlockPos base = new BlockPos(camp.center().getX(), ground - camp.layout().sink(), camp.center().getZ());
-		for (BlockPos pos : BlockPos.betweenClosed(base.offset(-half, 0, -half), base.offset(half, camp.layout().height() - 1, half))) {
+		int half = layout.half();
+		BlockPos base = new BlockPos(center.getX(), ground - layout.sink(), center.getZ());
+		for (BlockPos pos : BlockPos.betweenClosed(base.offset(-half, 0, -half), base.offset(half, layout.height() - 1, half))) {
 			if (level.getBlockState(pos).hasBlockEntity()) {
 				return true;
 			}
@@ -793,18 +841,95 @@ public final class Camps {
 		return false;
 	}
 
+	/** Moves the camp. The cost stays paid, the slot stays taken, and the owner's map is pointed at the new site once. */
+	private static void relocate(ServerLevel level, Camp camp, BlockPos site) {
+		BlockPos from = camp.center();
+		CampRegistry.replace(level, camp, camp.movedTo(site));
+		HELD_SITES.remove(heldKey(level, camp));
+		if (!announceMove(level, camp.owner(), camp.tier(), from, site)) {
+			MOVED_FROM.put(heldKey(level, camp.movedTo(site)), from.asLong());
+		}
+	}
+
 	/**
-	 * A block entity is in the footprint. The camp stays (the slot stays taken, nothing is refunded) until that block
-	 * is gone. The owner hears about it once.
+	 * Tells the owner where the camp went and retargets their map. False when they are not in this level, so the
+	 * caller can keep the notice until they are.
 	 */
-	private static void holdSite(ServerLevel level, Camp camp) {
-		if (!HELD_SITES.add(level.dimension() + "@" + camp.center().asLong())) {
+	private static boolean announceMove(ServerLevel level, UUID ownerId, CampTier tier, BlockPos from, BlockPos site) {
+		if (!(level.getPlayerByUUID(ownerId) instanceof Player owner)) {
+			return false;
+		}
+		retargetMaps(owner, from, site);
+		owner.sendSystemMessage(Component.translatable("message.warbands.camp_site_moved", tier.displayName(),
+				Directions.distance(from, site), Directions.compass(from, site)).withStyle(ChatFormatting.GOLD));
+		return true;
+	}
+
+	/** Owners who were away when the camp moved hear about the new site once, the next time they are in this level. */
+	private static void deliverMoves(ServerLevel level) {
+		if (MOVED_FROM.isEmpty()) {
 			return;
 		}
-		if (level.getPlayerByUUID(camp.owner()) instanceof Player owner) {
-			owner.sendSystemMessage(Component.translatable("message.warbands.camp_site_blocked", camp.tier().displayName())
-					.withStyle(ChatFormatting.GOLD));
+		String prefix = level.dimension() + "@";
+		for (Camp camp : CampRegistry.all(level)) {
+			String key = prefix + camp.center().asLong();
+			Long from = MOVED_FROM.get(key);
+			if (from != null && announceMove(level, camp.owner(), camp.tier(), BlockPos.of(from), camp.center())) {
+				MOVED_FROM.remove(key);
+			}
 		}
+	}
+
+	/** The filled-map War Map that pointed at {@code from} now points at {@code to}, red X included. */
+	private static void retargetMaps(Player player, BlockPos from, BlockPos to) {
+		BlockPos old = new BlockPos(from.getX(), 0, from.getZ());
+		BlockPos tagged = new BlockPos(to.getX(), 0, to.getZ());
+		for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+			ItemStack stack = player.getInventory().getItem(i);
+			BlockPos mapCamp = mapTarget(stack);
+			if (mapCamp == null || !mapCamp.equals(old)) {
+				continue;
+			}
+			CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+			tag.putLong(MAP_TAG, tagged.asLong());
+			stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+			MapItemSavedData.addTargetDecoration(stack, to, "warbands_camp", MapDecorationTypes.RED_X);
+		}
+	}
+
+	/**
+	 * Nowhere nearby passed the War Map site rules. The camp stays (the slot stays taken, nothing is refunded) until
+	 * that block is gone. The owner hears about it once, and only while they are online to be told.
+	 */
+	private static void holdSite(ServerLevel level, Camp camp) {
+		if (!(level.getPlayerByUUID(camp.owner()) instanceof Player owner)) {
+			return;
+		}
+		if (!HELD_SITES.add(heldKey(level, camp))) {
+			return;
+		}
+		owner.sendSystemMessage(Component.translatable("message.warbands.camp_site_blocked", camp.tier().displayName())
+				.withStyle(ChatFormatting.GOLD));
+	}
+
+	private static String heldKey(ServerLevel level, Camp camp) {
+		return level.dimension() + "@" + camp.center().asLong();
+	}
+
+	/** Drops notices for camps that were built, abandoned, moved, or removed, including other sessions' leftovers. */
+	private static void pruneHeld(ServerLevel level) {
+		String prefix = level.dimension() + "@";
+		Set<String> waiting = new HashSet<>();
+		Set<String> standing = new HashSet<>();
+		for (Camp camp : CampRegistry.all(level)) {
+			String key = prefix + camp.center().asLong();
+			standing.add(key);
+			if (!camp.built() && !camp.abandoned()) {
+				waiting.add(key);
+			}
+		}
+		HELD_SITES.removeIf(key -> key.startsWith(prefix) && !waiting.contains(key));
+		MOVED_FROM.keySet().removeIf(key -> key.startsWith(prefix) && !standing.contains(key));
 	}
 
 	/**

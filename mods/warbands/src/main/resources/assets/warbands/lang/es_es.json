@@ -176,6 +176,7 @@
   "message.warbands.need_feudal": "Tu Centro Urbano sigue en la Edad de Aldea",
   "message.warbands.refund_pending": "Tu Centro Urbano está fuera de alcance: el reembolso espera a que vuelva",
   "message.warbands.camp_site_blocked": "Tu sitio de campamento de %s tiene una construcción tuya, así que el campamento espera. Quita ese bloque y se construirá. El coste del mapa sigue pagado.",
+  "message.warbands.camp_site_moved": "Tu sitio de campamento de %s tenía una construcción tuya, así que se movió %s bloques al %s. El coste del mapa sigue pagado.",
   "tooltip.warbands.blueprint.feudal": "Requiere la Edad Feudal",
   "tooltip.warbands.spear": "Golpea como una Milicia, y más fuerte a jinetes, caballos y caballeros.",
   "advancements.warbands.barracks.title": "Levanta un cuartel",

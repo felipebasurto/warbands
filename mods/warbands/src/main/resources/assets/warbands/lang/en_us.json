@@ -176,6 +176,7 @@
   "message.warbands.need_feudal": "Your Town Center is still in the Village Age",
   "message.warbands.refund_pending": "Your Town Center is out of reach, so the refund waits until it is back",
   "message.warbands.camp_site_blocked": "Your %s camp site has a build of yours in it, so the camp is waiting. Clear that block and it will be built. The map's cost stays paid.",
+  "message.warbands.camp_site_moved": "Your %s camp site had a build of yours in it, so it moved %s blocks %s. The map's cost stays paid.",
   "tooltip.warbands.blueprint.feudal": "Requires the Feudal Age",
   "tooltip.warbands.spear": "Hits like a Militia, harder against riders, horses and knights.",
   "advancements.warbands.barracks.title": "Raise a Barracks",

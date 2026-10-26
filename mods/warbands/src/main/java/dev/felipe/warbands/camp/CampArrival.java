@@ -2,18 +2,21 @@ package dev.felipe.warbands.camp;
 
 /**
  * What to do with an unbuilt camp once a player is near and the footprint is ticking.
- * A block entity in that footprint (a chest placed on the site) holds the camp: it is not built over,
- * the map's cost is not returned, and the slot stays taken.
+ * A block entity there (a chest on the site) moves the camp to another clear site when one is nearby.
+ * The cost stays paid and the slot stays taken. With nowhere to move, the camp waits.
  */
 final class CampArrival {
 	enum Action {
-		BUILD, HOLD
+		BUILD, RELOCATE, HOLD
 	}
 
 	private CampArrival() {
 	}
 
-	static Action decide(boolean footprintBlocked) {
-		return footprintBlocked ? Action.HOLD : Action.BUILD;
+	static Action decide(boolean footprintBlocked, boolean siteFound) {
+		if (!footprintBlocked) {
+			return Action.BUILD;
+		}
+		return siteFound ? Action.RELOCATE : Action.HOLD;
 	}
 }

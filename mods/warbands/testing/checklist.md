@@ -55,7 +55,7 @@ How to use it:
 - [ ] `camps.claim-away` - owner offline: a bystander beside the banner is refused; a player who hit a guard claims, trophy and relic left there (~15 s)
 - [ ] `camps.keep` - Castle War Map: Keep built on arrival, gate, claim after guards, War Chest survives the burn, trophy, revenge, payout (photo, ~20 s)
 - [ ] `camps.abandon` - abandon unbuilt (forgotten) and built (stays, still takeable); buy again, no refund (~20 s)
-- [ ] `camps.keeps-player-builds` - a player's chest in a camp's footprint: the camp waits, the cost stays paid, the slot stays taken, the chest survives (~10 s)
+- [ ] `camps.keeps-player-builds` - a player's chest in a camp's footprint: the camp moves to a clear site nearby, the cost stays paid, the slot stays taken, the chest survives, the map follows (~30 s)
 - [ ] `camps.revenge-off` - taking a Fort with raids off schedules no revenge (~15 s)
 - [ ] `camps.kinds` - all 30 camp layouts (11 kinds) build with standard + the garrison their threat calls for; vanilla guards persistent and tagged (~60 s, photos of the new layouts)
 - [ ] `camps.findsite` - on the normal world every camp kind finds a home-biome site around towns (hit rate per kind logged)

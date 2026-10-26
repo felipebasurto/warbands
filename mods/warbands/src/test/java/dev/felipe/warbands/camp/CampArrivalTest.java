@@ -4,15 +4,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-/** Arrival at an unbuilt camp. Refunds and freeing the slot are outside this choice. */
+/** Arrival at an unbuilt camp. Paying the cost back and freeing the slot are outside this choice. */
 class CampArrivalTest {
 	@Test
-	void chestOnAnUnbuiltSiteHoldsTheCamp() {
-		assertEquals(CampArrival.Action.HOLD, CampArrival.decide(true));
+	void openSiteBuilds() {
+		assertEquals(CampArrival.Action.BUILD, CampArrival.decide(false, false));
+		assertEquals(CampArrival.Action.BUILD, CampArrival.decide(false, true));
 	}
 
 	@Test
-	void openSiteBuilds() {
-		assertEquals(CampArrival.Action.BUILD, CampArrival.decide(false));
+	void blockedSiteMovesWhenAnotherSpotExists() {
+		assertEquals(CampArrival.Action.RELOCATE, CampArrival.decide(true, true));
+	}
+
+	@Test
+	void blockedSiteHoldsWhenNowhereIsClear() {
+		assertEquals(CampArrival.Action.HOLD, CampArrival.decide(true, false));
 	}
 }
