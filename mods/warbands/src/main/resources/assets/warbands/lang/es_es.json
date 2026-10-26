@@ -185,7 +185,7 @@
   "handbook.warbands.barracks.title": "Cuartel",
   "handbook.warbands.barracks.body": "Edad Feudal, 100 de piedra. Entrena lanceros (página siguiente).",
   "handbook.warbands.spearman.title": "Lancero",
-  "handbook.warbands.spearman.body": "Se entrena en el Cuartel: 40 comida, 20 madera, 15 oro, 22 s.\n\nPega como la milicia, más 4 contra caballos y sus jinetes. Más barato, y cuesta madera en vez de oro.",
+  "handbook.warbands.spearman.body": "Se entrena en el Cuartel: 40 comida, 20 madera, 15 oro, 22 s.\n\nPega como la milicia, más 4 contra caballos y sus jinetes. Más barato, y cuesta madera además de oro.",
   "guide.warbands.caption.spear": "Lanza",
   "guide.warbands.caption.vs_riders": "+4 a jinetes",
   "age.warbands.unlocks.feudal": "Desbloquea los planos del Cuartel, el Campo de tiro y la Herrería",
