@@ -626,8 +626,9 @@ public final class Camps {
 		if (resumed.save()) {
 			camp = CampRegistry.finishBurnPause(level, camp, resumed.razeAt());
 		}
-		String key = level.dimension() + "@" + camp.center().asLong();
-		Burn burn = BURNS.computeIfAbsent(key, k -> new Burn(level, camp));
+		Camp current = camp;
+		String key = level.dimension() + "@" + current.center().asLong();
+		Burn burn = BURNS.computeIfAbsent(key, k -> new Burn(level, current));
 		BlockPos c = camp.center();
 		float progress = Mth.clamp(1.0F - (float) (camp.razeAt() - now) / BURN_TICKS, 0.0F, 1.0F);
 		var random = level.getRandom();
