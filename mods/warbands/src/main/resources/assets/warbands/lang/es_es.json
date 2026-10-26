@@ -37,6 +37,7 @@
   "gui.warbands.accepts.stone": "Roca, piedra, pizarra profunda... = 1",
   "gui.warbands.accepts.gold": "Pepita = 1, lingote = 9, bloque = 81",
   "message.warbands.not_your_town": "Este Centro Urbano pertenece a %s",
+  "message.warbands.deposit_rejected": "El Centro Urbano no acepta %s",
   "message.warbands.need_houses": "Límite de población alcanzado: construye más casas",
   "message.warbands.blocked": "Hay algo en el camino (solo se puede despejar terreno natural)",
   "message.warbands.step_back": "Sal del área de construcción",
