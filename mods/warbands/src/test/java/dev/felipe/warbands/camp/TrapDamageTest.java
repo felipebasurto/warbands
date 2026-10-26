@@ -6,31 +6,33 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 /**
- * Who a camp gun or a powder keg is allowed to hurt. No world is started: dispensers, explosions,
- * and the damage event are not covered here.
+ * Which hits spare a camp's own guards. No world is started: dispensers are not fired, kegs are not lit,
+ * and nobody is actually damaged.
  */
 class TrapDamageTest {
 	@Test
-	void campGunSparesOwnGuardEvenThoughTheArrowIsNamedAsTheAttacker() {
-		assertTrue(TrapDamage.sparesOwnGuard(true, true, false, true, true, false));
+	void thisCampsGunSparesItsGuard() {
+		assertTrue(TrapDamage.sparesOwnGuard(true, true, true, false));
 	}
 
 	@Test
-	void powderKegSparesOwnGuard() {
-		assertTrue(TrapDamage.sparesOwnGuard(true, false, false, false, false, true));
+	void thisCampsPowderKegSparesItsGuard() {
+		assertTrue(TrapDamage.sparesOwnGuard(true, false, false, true));
 	}
 
 	@Test
-	void playersAndEnemiesStillTakeGunAndKegDamage() {
-		assertFalse(TrapDamage.sparesOwnGuard(false, true, false, true, true, false));
-		assertFalse(TrapDamage.sparesOwnGuard(false, false, false, false, false, true));
+	void playerDispenserStillHurtsGuards() {
+		assertFalse(TrapDamage.sparesOwnGuard(true, true, false, false));
 	}
 
 	@Test
-	void guardsStillTakeAimedShotsAndBlastsThatNameSomeone() {
-		assertFalse(TrapDamage.sparesOwnGuard(true, true, true, true, true, false));
-		assertFalse(TrapDamage.sparesOwnGuard(true, false, false, true, true, false));
-		assertFalse(TrapDamage.sparesOwnGuard(true, false, false, true, true, true));
-		assertFalse(TrapDamage.sparesOwnGuard(true, false, false, false, true, true));
+	void tntStillHurtsGuards() {
+		assertFalse(TrapDamage.sparesOwnGuard(true, false, false, false));
+	}
+
+	@Test
+	void playersAndEnemiesStillTakeCampGunsAndKegs() {
+		assertFalse(TrapDamage.sparesOwnGuard(false, true, true, false));
+		assertFalse(TrapDamage.sparesOwnGuard(false, false, false, true));
 	}
 }
