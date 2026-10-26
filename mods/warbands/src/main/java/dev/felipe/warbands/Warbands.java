@@ -43,9 +43,14 @@ public class Warbands implements ModInitializer {
 		ServerTickEvents.END_LEVEL_TICK.register(Camps::tick);
 		ServerTickEvents.END_LEVEL_TICK.register(Relics::tick);
 
-		// No friendly fire between a player, their soldiers and their pets.
-		ServerLivingEntityEvents.ALLOW_DAMAGE.register(
-				(victim, source, amount) -> !SoldierEntity.isFriendlyFire(victim, source.getEntity()));
+		// No friendly fire between a player, their soldiers and their pets. This camp's own guns and
+		// powder kegs also spare its guards; a player's dispenser or TNT still hits them.
+		ServerLivingEntityEvents.ALLOW_DAMAGE.register((victim, source, amount) -> {
+			if (SoldierEntity.isFriendlyFire(victim, source.getEntity())) {
+				return false;
+			}
+			return !Traps.sparesGuard(victim, source);
+		});
 
 		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamageTaken, damageTaken, blocked) -> Camps.noteFight(entity, source));
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> Camps.guardDied(entity, source));
