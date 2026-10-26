@@ -7,6 +7,7 @@ import dev.felipe.warbands.entity.ai.MarchGoal;
 import dev.felipe.warbands.entity.ai.RaiderTargetGoal;
 import dev.felipe.warbands.entity.ai.FollowWhenOrderedGoal;
 import dev.felipe.warbands.entity.ai.OrderedStrollGoal;
+import dev.felipe.warbands.raid.RaidDeparture;
 import dev.felipe.warbands.raid.RaidKind;
 import dev.felipe.warbands.raid.RaidRegistry;
 import dev.felipe.warbands.raid.Raids;
@@ -709,6 +710,18 @@ public abstract class SoldierEntity extends TamableAnimal {
 	@Override
 	protected int getBaseExperienceReward(ServerLevel level) {
 		return isRaider() ? 0 : super.getBaseExperienceReward(level);
+	}
+
+	/**
+	 * A portal copies the raider into the other dimension, then {@code setRemoved(CHANGED_DIMENSION)} on this one.
+	 * That never calls {@link #remove} or {@link #die}, so the raid would keep counting a raider who has left.
+	 */
+	@Override
+	public void onRemoval(RemovalReason reason) {
+		super.onRemoval(reason);
+		if (RaidDeparture.dropsFromCount(reason) && this.raidTown != null && this.level() instanceof ServerLevel level) {
+			Raids.raiderDied(level, this.raidTown, this);
+		}
 	}
 
 	/** A raid counts its raiders by their deaths, not by who it can find: unloaded raiders aren't dead. */
