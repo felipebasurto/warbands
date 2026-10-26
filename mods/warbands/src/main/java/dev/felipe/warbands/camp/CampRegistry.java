@@ -32,6 +32,8 @@ public final class CampRegistry {
 	/**
 	 * {@code cleared}: its guards are all dead and the owner was told to claim it. {@code razeAt}: game time a taken camp
 	 * finishes burning and is cleared away (0 while standing); {@code razed}: already cleared.
+	 * RecordCodecBuilder takes 16 fields and this record is already there, so participants and a burn pause are stored
+	 * beside the camps.
 	 */
 	public record Camp(UUID owner, BlockPos town, CampTier tier, BlockPos center, Rotation rotation, boolean built,
 			List<UUID> guards, boolean conquered, boolean paid, boolean abandoned, boolean cleared, long razeAt, boolean razed,
@@ -93,6 +95,12 @@ public final class CampRegistry {
 			return new Camp(owner, town, tier, center, rotation, true, List.of(), true, false, abandoned, true, razeAt, false, layoutId, threat, tracked);
 		}
 
+		/** Same camp, with the burn's deadline moved once when a pause ends. */
+		Camp withRazeAt(long razeAt) {
+			return new Camp(owner, town, tier, center, rotation, built, guards, conquered, paid, abandoned, cleared, razeAt, razed,
+					layoutId, threat, tracked);
+		}
+
 		Camp asPaid() {
 			return new Camp(owner, town, tier, center, rotation, built, guards, conquered, true, abandoned, cleared, razeAt, razed, layoutId, threat, tracked);
 		}
@@ -119,22 +127,30 @@ public final class CampRegistry {
 				TIER_CODEC.optionalFieldOf("last").forGetter(Bag::last)).apply(i, Bag::new));
 	}
 
+	/** NBT map keys have to be strings; a numeric key drops the whole attachment on save. */
+	private static final Codec<Long> LONG_KEY = Codec.STRING.xmap(Long::parseLong, center -> Long.toString(center));
+
 	/**
 	 * {@code camps}: every chosen camp. {@code bags}: per player the kinds still to be drawn (Phase 4C). Saved as a
 	 * map; worlds saved before the kinds existed keep a bare list, which loads as camps with no bags.
-	 * {@code participants}: players who traded blows with a camp, keyed by {@link #key(Camp)}. Saved beside the camps
-	 * because a camp record is already at the codec's field limit. Missing on old saves, so only the owner can claim those.
+	 * {@code participants}: players who traded blows with a camp, keyed by {@link #key(Camp)}. Missing on old saves,
+	 * so only the owner can claim those.
+	 * {@code burnPauses}: game time a burning camp first found its footprint not ticking, keyed by the camp center
+	 * ({@link BlockPos#asLong()}). Old saves omit it.
+	 * Both sit beside the camps because {@link Camp} is already at the codec's field limit.
 	 */
-	public record Data(List<Camp> camps, Map<UUID, Bag> bags, Map<String, List<UUID>> participants) {
+	public record Data(List<Camp> camps, Map<UUID, Bag> bags, Map<String, List<UUID>> participants, Map<Long, Long> burnPauses) {
+		/** Camps and bags only: saves from before participants and burn pauses, and callers that have neither. */
 		public Data(List<Camp> camps, Map<UUID, Bag> bags) {
-			this(camps, bags, Map.of());
+			this(camps, bags, Map.of(), Map.of());
 		}
 
 		public static final Data EMPTY = new Data(List.of(), Map.of());
 		private static final Codec<Data> CURRENT = RecordCodecBuilder.create(i -> i.group(
 				Camp.CODEC.listOf().fieldOf("camps").forGetter(Data::camps),
 				Codec.unboundedMap(UUIDUtil.STRING_CODEC, Bag.CODEC).optionalFieldOf("bags", Map.of()).forGetter(Data::bags),
-				Codec.unboundedMap(Codec.STRING, UUIDUtil.CODEC.listOf()).optionalFieldOf("participants", Map.of()).forGetter(Data::participants))
+				Codec.unboundedMap(Codec.STRING, UUIDUtil.CODEC.listOf()).optionalFieldOf("participants", Map.of()).forGetter(Data::participants),
+				Codec.unboundedMap(LONG_KEY, Codec.LONG).optionalFieldOf("burn_pauses", Map.of()).forGetter(Data::burnPauses))
 				.apply(i, Data::new));
 		public static final Codec<Data> CODEC = Codec.either(Camp.CODEC.listOf(), CURRENT).xmap(
 				either -> either.map(camps -> new Data(camps, Map.of()), d -> d), Either::right);
@@ -157,7 +173,7 @@ public final class CampRegistry {
 		Data data = level.getAttachedOrCreate(ModAttachments.CAMPS);
 		Map<UUID, Bag> bags = new HashMap<>(data.bags());
 		bags.put(owner, bag);
-		level.setAttached(ModAttachments.CAMPS, new Data(data.camps(), Map.copyOf(bags), data.participants()));
+		level.setAttached(ModAttachments.CAMPS, new Data(data.camps(), Map.copyOf(bags), data.participants(), data.burnPauses()));
 	}
 
 	/** Players recorded as having fought {@code camp}. Empty when nobody has, including on old saves. */
@@ -177,7 +193,47 @@ public final class CampRegistry {
 		next.add(fighter);
 		Map<String, List<UUID>> participants = new HashMap<>(data.participants());
 		participants.put(key(camp), List.copyOf(next));
-		level.setAttached(ModAttachments.CAMPS, new Data(data.camps(), data.bags(), Map.copyOf(participants)));
+		level.setAttached(ModAttachments.CAMPS, new Data(data.camps(), data.bags(), Map.copyOf(participants), data.burnPauses()));
+	}
+
+	/** Game time this camp's burn was paused, or {@link BurnSchedule#NOT_PAUSED}. */
+	static long burnPausedAt(ServerLevel level, Camp camp) {
+		return level.getAttachedOrCreate(ModAttachments.CAMPS).burnPauses().getOrDefault(camp.center().asLong(), BurnSchedule.NOT_PAUSED);
+	}
+
+	/** Records the start of a pause. A second call with the same time does not rewrite the attachment. */
+	static void noteBurnPaused(ServerLevel level, Camp camp, long pausedAt) {
+		Data data = level.getAttachedOrCreate(ModAttachments.CAMPS);
+		long center = camp.center().asLong();
+		if (data.burnPauses().getOrDefault(center, BurnSchedule.NOT_PAUSED) == pausedAt) {
+			return;
+		}
+		Map<Long, Long> pauses = new HashMap<>(data.burnPauses());
+		pauses.put(center, pausedAt);
+		level.setAttached(ModAttachments.CAMPS, new Data(data.camps(), data.bags(), data.participants(), Map.copyOf(pauses)));
+	}
+
+	/**
+	 * Ends a pause: drops the saved start and, when {@code razeAt} changed, stores the shifted deadline.
+	 * Fighter lists and any other pauses are kept for camps that remain. Returns the camp the rest of the tick should use.
+	 */
+	static Camp finishBurnPause(ServerLevel level, Camp camp, long razeAt) {
+		Data data = level.getAttachedOrCreate(ModAttachments.CAMPS);
+		Map<Long, Long> pauses = new HashMap<>(data.burnPauses());
+		pauses.remove(camp.center().asLong());
+		List<Camp> camps = new ArrayList<>(data.camps());
+		Camp updated = camp;
+		if (razeAt != camp.razeAt()) {
+			updated = camp.withRazeAt(razeAt);
+			int index = camps.indexOf(camp);
+			if (index >= 0) {
+				camps.set(index, updated);
+			} else {
+				camps.add(updated);
+			}
+		}
+		level.setAttached(ModAttachments.CAMPS, stored(camps, data.bags(), data.participants(), pauses));
+		return updated;
 	}
 
 	/** Owner and center: both stay put once a camp is built, which is when a fight can be recorded. */
@@ -197,6 +253,24 @@ public final class CampRegistry {
 		return Map.copyOf(next);
 	}
 
+	/** Drops pause stamps for camps that are no longer saved. */
+	private static Map<Long, Long> keptPauses(List<Camp> camps, Map<Long, Long> burnPauses) {
+		Map<Long, Long> next = new HashMap<>();
+		for (Camp camp : camps) {
+			Long pausedAt = burnPauses.get(camp.center().asLong());
+			if (pausedAt != null) {
+				next.put(camp.center().asLong(), pausedAt);
+			}
+		}
+		return Map.copyOf(next);
+	}
+
+	/** Saves the camp list and prunes both side maps down to camps that are still in it. */
+	private static Data stored(List<Camp> camps, Map<UUID, Bag> bags, Map<String, List<UUID>> participants, Map<Long, Long> burnPauses) {
+		List<Camp> keptCamps = List.copyOf(camps);
+		return new Data(keptCamps, bags, kept(keptCamps, participants), keptPauses(keptCamps, burnPauses));
+	}
+
 	/** The player's camp still to conquer (at most one at a time). An abandoned camp no longer counts. */
 	public static Optional<Camp> active(ServerLevel level, UUID owner) {
 		return all(level).stream().filter(c -> c.owner().equals(owner) && !c.conquered() && !c.abandoned()).findFirst();
@@ -206,8 +280,7 @@ public final class CampRegistry {
 		Data data = level.getAttachedOrCreate(ModAttachments.CAMPS);
 		List<Camp> camps = new ArrayList<>(data.camps());
 		if (camps.remove(camp)) {
-			List<Camp> keptCamps = List.copyOf(camps);
-			level.setAttached(ModAttachments.CAMPS, new Data(keptCamps, data.bags(), kept(keptCamps, data.participants())));
+			level.setAttached(ModAttachments.CAMPS, stored(camps, data.bags(), data.participants(), data.burnPauses()));
 		}
 	}
 
@@ -220,16 +293,14 @@ public final class CampRegistry {
 		} else {
 			camps.add(updated);
 		}
-		List<Camp> keptCamps = List.copyOf(camps);
-		level.setAttached(ModAttachments.CAMPS, new Data(keptCamps, data.bags(), kept(keptCamps, data.participants())));
+		level.setAttached(ModAttachments.CAMPS, stored(camps, data.bags(), data.participants(), data.burnPauses()));
 	}
 
 	static void add(ServerLevel level, Camp camp) {
 		Data data = level.getAttachedOrCreate(ModAttachments.CAMPS);
 		List<Camp> camps = new ArrayList<>(data.camps());
 		camps.add(camp);
-		List<Camp> keptCamps = List.copyOf(camps);
-		level.setAttached(ModAttachments.CAMPS, new Data(keptCamps, data.bags(), kept(keptCamps, data.participants())));
+		level.setAttached(ModAttachments.CAMPS, stored(camps, data.bags(), data.participants(), data.burnPauses()));
 	}
 
 	/**
@@ -246,7 +317,6 @@ public final class CampRegistry {
 				finished--;
 			}
 		}
-		List<Camp> keptCamps = List.copyOf(camps);
-		level.setAttached(ModAttachments.CAMPS, new Data(keptCamps, data.bags(), kept(keptCamps, data.participants())));
+		level.setAttached(ModAttachments.CAMPS, stored(camps, data.bags(), data.participants(), data.burnPauses()));
 	}
 }
