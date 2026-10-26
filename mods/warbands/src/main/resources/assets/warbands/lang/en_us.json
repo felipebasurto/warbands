@@ -185,7 +185,7 @@
   "handbook.warbands.barracks.title": "Barracks",
   "handbook.warbands.barracks.body": "Feudal Age, 100 stone. Trains Spearmen (next page).",
   "handbook.warbands.spearman.title": "Spearman",
-  "handbook.warbands.spearman.body": "Trained at the Barracks: 40 food, 20 wood, 15 gold, 22 s.\n\nHits like a Militia, plus 4 against horses and their riders. Cheaper, and costs wood instead of gold.",
+  "handbook.warbands.spearman.body": "Trained at the Barracks: 40 food, 20 wood, 15 gold, 22 s.\n\nHits like a Militia, plus 4 against horses and their riders. Cheaper, and costs wood as well as gold.",
   "guide.warbands.caption.spear": "Spear",
   "guide.warbands.caption.vs_riders": "+4 vs riders",
   "age.warbands.unlocks.feudal": "Unlocks the Barracks, Archery Range and Blacksmith blueprints",
