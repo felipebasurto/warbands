@@ -66,7 +66,10 @@ public final class Traps {
 	private static final int TRAP_ARROW_TICKS = 5 * 20;
 	private static final ArrayDeque<AbstractArrow> TRAP_ARROWS = new ArrayDeque<>();
 
-	/** Dispenser-in-camp seal (open and break), unrecoverable trap arrows and the caltrops path-type. */
+	/**
+	 * Dispenser-in-camp seal (open and break), unrecoverable trap arrows and the caltrops path-type. Hoppers pull
+	 * without opening the block; that path is {@code HopperDispenserMixin}.
+	 */
 	public static void initialize() {
 		UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
 			if (!(level instanceof ServerLevel server)
