@@ -276,7 +276,8 @@ public final class Raids {
 				}
 			}
 			case ATTACK -> {
-				// active.raiders() loses a raider when it dies, so one in an unloaded chunk still counts as standing.
+				// active.raiders() loses a raider when it dies or a portal takes it to another dimension, so one in an
+				// unloaded chunk still counts as standing.
 				// Checked before the owner: chasing the last raider far from town still wins the raid.
 				int left = active.raiders().size();
 				bar.setName(Component.translatable("bossbar.warbands.raid", active.kind().displayName(), left));
