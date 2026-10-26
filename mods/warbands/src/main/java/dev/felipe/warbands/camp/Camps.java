@@ -611,7 +611,15 @@ public final class Camps {
 	 * falls as loot.
 	 */
 	private static void tickBurning(ServerLevel level, Camp camp, long now) {
-		if (!level.isLoaded(camp.center())) {
+		// Don't read or write blocks until every chunk of the footprint is ticking. A block read loads a missing
+		// chunk, and burning only the loaded part would mark the camp razed while the rest is still standing.
+		// Time spent unloaded is added back onto the deadline, so the fire continues when the chunks load.
+		// A deadline that has already passed is left where it is: that visit clears whatever still stands.
+		if (!Ground.ready(level, camp.center(), camp.layout().half())) {
+			long deferred = BurnSchedule.defer(camp.razeAt(), now, BURN_STEP);
+			if (deferred != camp.razeAt()) {
+				CampRegistry.replace(level, camp, camp.withRazeAt(deferred));
+			}
 			return;
 		}
 		String key = level.dimension() + "@" + camp.center().asLong();

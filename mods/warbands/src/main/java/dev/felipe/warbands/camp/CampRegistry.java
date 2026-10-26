@@ -93,6 +93,12 @@ public final class CampRegistry {
 			return new Camp(owner, town, tier, center, rotation, true, List.of(), true, false, abandoned, true, razeAt, false, layoutId, threat, tracked);
 		}
 
+		/** Same camp, with the burn's deadline moved (while its chunks aren't ticking). */
+		Camp withRazeAt(long razeAt) {
+			return new Camp(owner, town, tier, center, rotation, built, guards, conquered, paid, abandoned, cleared, razeAt, razed,
+					layoutId, threat, tracked);
+		}
+
 		Camp asPaid() {
 			return new Camp(owner, town, tier, center, rotation, built, guards, conquered, true, abandoned, cleared, razeAt, razed, layoutId, threat, tracked);
 		}
