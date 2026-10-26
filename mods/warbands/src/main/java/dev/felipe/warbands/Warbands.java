@@ -8,6 +8,7 @@ import dev.felipe.warbands.registry.ModEntities;
 import dev.felipe.warbands.registry.ModGameRules;
 import dev.felipe.warbands.raid.Raids;
 import dev.felipe.warbands.camp.Camps;
+import dev.felipe.warbands.camp.TrapDamage;
 import dev.felipe.warbands.camp.Traps;
 import dev.felipe.warbands.registry.ModMenus;
 import net.fabricmc.api.ModInitializer;
@@ -19,6 +20,9 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.minecraft.world.damagesource.DamageTypes;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
@@ -43,9 +47,18 @@ public class Warbands implements ModInitializer {
 		ServerTickEvents.END_LEVEL_TICK.register(Camps::tick);
 		ServerTickEvents.END_LEVEL_TICK.register(Relics::tick);
 
-		// No friendly fire between a player, their soldiers and their pets.
-		ServerLivingEntityEvents.ALLOW_DAMAGE.register(
-				(victim, source, amount) -> !SoldierEntity.isFriendlyFire(victim, source.getEntity()));
+		// No friendly fire between a player, their soldiers and their pets. Camp guns and powder kegs
+		// also spare the camp's own guards; players and enemies still take that damage.
+		ServerLivingEntityEvents.ALLOW_DAMAGE.register((victim, source, amount) -> {
+			if (SoldierEntity.isFriendlyFire(victim, source.getEntity())) {
+				return false;
+			}
+			Entity direct = source.getDirectEntity();
+			AbstractArrow arrow = direct instanceof AbstractArrow shot ? shot : null;
+			return !TrapDamage.sparesOwnGuard(Traps.campOwn(victim), arrow != null,
+					arrow != null && arrow.getOwner() != null, source.getEntity() != null, direct != null,
+					source.is(DamageTypes.EXPLOSION));
+		});
 
 		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamageTaken, damageTaken, blocked) -> Camps.noteFight(entity, source));
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> Camps.guardDied(entity, source));
