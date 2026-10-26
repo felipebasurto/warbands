@@ -76,6 +76,12 @@ public final class CampRegistry {
 			return tier.layout(layoutId);
 		}
 
+		/** Same unbuilt camp, standing on a different site. The cost and the slot are unchanged. */
+		Camp movedTo(BlockPos center) {
+			return new Camp(owner, town, tier, center, rotation, built, guards, conquered, paid, abandoned, cleared, razeAt, razed,
+					layoutId, threat, tracked);
+		}
+
 		Camp asBuilt(BlockPos center, List<UUID> guards, Threat threat) {
 			return new Camp(owner, town, tier, center, rotation, true, List.copyOf(guards), false, false, abandoned, false, 0L, false,
 					layoutId, threat, true);

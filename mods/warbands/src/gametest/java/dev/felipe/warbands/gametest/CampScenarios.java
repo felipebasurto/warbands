@@ -75,7 +75,7 @@ final class CampScenarios {
 				CampScenarios::keep));
 		all.add(new Scenario("camps.abandon", "abandoning a camp: an unbuilt one is forgotten, a built one stays and can still be taken; a new map can be bought",
 				CampScenarios::abandon));
-		all.add(new Scenario("camps.keeps-player-builds", "a player's chest in a camp's footprint: the camp is dropped when the player arrives, the map's cost comes back, the chest survives",
+		all.add(new Scenario("camps.keeps-player-builds", "a player's chest in a camp's footprint: the camp moves to a clear site nearby, the map's cost stays paid, the slot stays taken, the chest survives",
 				CampScenarios::keepsPlayerBuilds));
 		all.add(new Scenario("camps.revenge-off", "taking a Fort with raids turned off schedules no revenge raid", CampScenarios::revengeOff));
 		all.add(new Scenario("camps.kinds", "every camp kind builds, keeps its guards (vanilla ones too: persistent, no drops), one of each per bag cycle (photos)",
@@ -414,27 +414,45 @@ final class CampScenarios {
 		Run.Town town = run.placeTown();
 		BlockPos core = town.core();
 		run.stockUp(core);
-		BlockPos[] spot = new BlockPos[1];
+		BlockPos[] chest = new BlockPos[1];
+		BlockPos[] site = new BlockPos[1];
 		int[] food = new int[1];
 		run.server(server -> {
 			ServerLevel level = server.overworld();
 			ServerPlayer player = player(server);
 			food[0] = townCenter(level, core).stock(Resource.FOOD);
 			check(Camps.buy(level, townCenter(level, core), player, CampTier.BANDIT_CAMP), "a War Map is bought");
-			BlockPos site = active(server).center();
-			level.getChunk(site.getX() >> 4, site.getZ() >> 4);
-			BlockPos chest = site.atY(level.getHeight(Heightmap.Types.WORLD_SURFACE, site.getX(), site.getZ()) + 1);
-			level.setBlock(chest, Blocks.CHEST.defaultBlockState(), 3);
-			spot[0] = chest;
+			BlockPos center = active(server).center();
+			site[0] = center;
+			level.getChunk(center.getX() >> 4, center.getZ() >> 4);
+			BlockPos placed = center.atY(level.getHeight(Heightmap.Types.WORLD_SURFACE, center.getX(), center.getZ()) + 1);
+			level.setBlock(placed, Blocks.CHEST.defaultBlockState(), 3);
+			chest[0] = placed;
 		});
-		run.tp(spot[0].getX() + 0.5, spot[0].getY() + 20, spot[0].getZ() + 40.5, 180.0F, 30.0F);
-		run.waitFor(server -> CampRegistry.active(server.overworld(), player(server).getUUID()).isEmpty(),
-				"a camp with a player's chest in its footprint is dropped", 20 * 30);
+		run.tp(chest[0].getX() + 0.5, chest[0].getY() + 20, chest[0].getZ() + 40.5, 180.0F, 30.0F);
+		// The arrival check runs every 40 ticks once the chunks tick. A chest used to refund the map and free the slot.
+		run.waitFor(server -> {
+			Camp camp = CampRegistry.active(server.overworld(), player(server).getUUID()).orElse(null);
+			return camp != null && (camp.center().getX() != site[0].getX() || camp.center().getZ() != site[0].getZ());
+		}, "a chest on an unbuilt camp moves it to a clear site", 20 * 30);
 		run.server(server -> {
 			ServerLevel level = server.overworld();
-			check(level.getBlockState(spot[0]).is(Blocks.CHEST), "the player's chest survives");
-			check(townCenter(level, core).stock(Resource.FOOD) == food[0], "the map's cost goes back to the Town Center");
-			check(CampRegistry.all(level).stream().noneMatch(c -> c.built() && c.center().getX() == spot[0].getX()), "no camp was built there");
+			ServerPlayer player = player(server);
+			Camp camp = CampRegistry.active(level, player.getUUID()).orElseThrow();
+			check(level.getBlockState(chest[0]).is(Blocks.CHEST), "the chest survives");
+			check(townCenter(level, core).stock(Resource.FOOD) == food[0] - CampTier.BANDIT_CAMP.cost(Resource.FOOD),
+					"the map's cost stays paid");
+			check(Camps.whyNot(level, townCenter(level, core), player.getUUID()) != null, "the slot stays taken");
+			BlockPos target = null;
+			for (ItemStack stack : player.getInventory().getNonEquipmentItems()) {
+				BlockPos mapCamp = Camps.mapTarget(stack);
+				if (mapCamp != null) {
+					target = mapCamp;
+					break;
+				}
+			}
+			check(target != null && target.equals(new BlockPos(camp.center().getX(), 0, camp.center().getZ())),
+					"the map points at the new site");
 		});
 	}
 
