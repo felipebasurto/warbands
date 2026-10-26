@@ -31,4 +31,4 @@ Try the beta in a disposable world and back up any world you care about. Upgradi
 
 [Report a bug](https://github.com/felipebasurto/warbands/issues) with the mod version, Minecraft/Fabric versions, reproduction steps and relevant log or screenshot. [Source code](https://github.com/felipebasurto/warbands) · [Changelog](mods/warbands/CHANGELOG.md).
 
-Warbands was built with AI assistance, as documented in the repository's making-of. The project is licensed CC0-1.0. It is an independent Minecraft mod.
+Warbands was built with AI assistance. The project is licensed CC0-1.0. It is an independent Minecraft mod.
