@@ -613,14 +613,18 @@ public final class Camps {
 	private static void tickBurning(ServerLevel level, Camp camp, long now) {
 		// Don't read or write blocks until every chunk of the footprint is ticking. A block read loads a missing
 		// chunk, and burning only the loaded part would mark the camp razed while the rest is still standing.
-		// Time spent unloaded is added back onto the deadline, so the fire continues when the chunks load.
+		// The pause start is saved once. When the footprint ticks again the deadline moves by that whole gap.
 		// A deadline that has already passed is left where it is: that visit clears whatever still stands.
 		if (!Ground.ready(level, camp.center(), camp.layout().half())) {
-			long deferred = BurnSchedule.defer(camp.razeAt(), now, BURN_STEP);
-			if (deferred != camp.razeAt()) {
-				CampRegistry.replace(level, camp, camp.withRazeAt(deferred));
+			BurnSchedule.Decision decision = BurnSchedule.whileUnloaded(camp.razeAt(), CampRegistry.burnPausedAt(level, camp), now);
+			if (decision.save()) {
+				CampRegistry.noteBurnPaused(level, camp, decision.pausedAt());
 			}
 			return;
+		}
+		BurnSchedule.Decision resumed = BurnSchedule.whileReady(camp.razeAt(), CampRegistry.burnPausedAt(level, camp), now);
+		if (resumed.save()) {
+			camp = CampRegistry.finishBurnPause(level, camp, resumed.razeAt());
 		}
 		String key = level.dimension() + "@" + camp.center().asLong();
 		Burn burn = BURNS.computeIfAbsent(key, k -> new Burn(level, camp));
