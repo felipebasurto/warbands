@@ -1,6 +1,7 @@
 package dev.felipe.warbands.town;
 
 import dev.felipe.warbands.entity.SoldierSpawner;
+import dev.felipe.warbands.registry.ModBlocks;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -250,10 +251,10 @@ public class TrainingBlockEntity extends BlockEntity implements MenuProvider {
 	@Override
 	public void preRemoveSideEffects(BlockPos pos, BlockState state) {
 		super.preRemoveSideEffects(pos, state);
-		if (!(this.level instanceof ServerLevel level) || owner == null || queue.isEmpty()) {
+		if (!(this.level instanceof ServerLevel level) || owner == null) {
 			return;
 		}
-		TownCenterBlockEntity town = TownRegistry.nearestOwned(level, pos, owner, TownCenterBlockEntity.HOUSE_RADIUS);
+		TownCenterBlockEntity town = townToRefund(level, pos);
 		if (town == null) {
 			return;
 		}
@@ -265,6 +266,38 @@ public class TrainingBlockEntity extends BlockEntity implements MenuProvider {
 			town.refund(type);
 		}
 		pendingRefunds.clear();
+	}
+
+	/**
+	 * The center {@link TrainingRefund} picked. {@link TownRegistry#nearestOwned} only sees a loaded center, so a break
+	 * while that chunk is unloaded used to drop the queue. An unloaded center in range is loaded for this refund.
+	 */
+	private @Nullable TownCenterBlockEntity townToRefund(ServerLevel level, BlockPos pos) {
+		boolean owed = !queue.isEmpty() || !pendingRefunds.isEmpty();
+		if (!owed) {
+			return null;
+		}
+		double radiusSqr = (double) TownCenterBlockEntity.HOUSE_RADIUS * TownCenterBlockEntity.HOUSE_RADIUS;
+		List<TrainingRefund.Center> centers = new ArrayList<>();
+		for (TownRegistry.Town town : TownRegistry.towns(level)) {
+			if (!town.owner().equals(owner)) {
+				continue;
+			}
+			boolean loaded = level.isLoaded(town.pos());
+			if (loaded && !level.getBlockState(town.pos()).is(ModBlocks.TOWN_CENTER)) {
+				continue;
+			}
+			centers.add(new TrainingRefund.Center(town.pos().asLong(), loaded, town.pos().distSqr(pos)));
+		}
+		TrainingRefund.Choice choice = TrainingRefund.choose(owed, centers, radiusSqr);
+		if (choice == null) {
+			return null;
+		}
+		BlockPos townPos = BlockPos.of(choice.pos());
+		if (choice.loadChunk()) {
+			level.getChunk(townPos.getX() >> 4, townPos.getZ() >> 4);
+		}
+		return level.getBlockEntity(townPos) instanceof TownCenterBlockEntity center ? center : null;
 	}
 
 	@Override
