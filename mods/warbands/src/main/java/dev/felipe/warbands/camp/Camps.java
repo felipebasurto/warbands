@@ -28,9 +28,11 @@ import dev.felipe.warbands.town.TownCenterBlockEntity;
 import dev.felipe.warbands.town.UnitType;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -118,11 +120,14 @@ public final class Camps {
 	private static final Map<String, Burn> BURNS = new HashMap<>();
 	/** Last alarm per camp (level and center), for the war relays. Not saved: a camp calms down over a restart. */
 	private static final Map<String, Long> ALARMS = new HashMap<>();
+	/** Camps already told that a block entity is holding them. Not saved: a restart may say it once more. */
+	private static final Set<String> HELD_SITES = new HashSet<>();
 
 	/** Forgets burns and alarms of a world that has closed (statics outlive a singleplayer world in one session). */
 	public static void clearState() {
 		BURNS.clear();
 		ALARMS.clear();
+		HELD_SITES.clear();
 	}
 	/** A camp stays alarmed (its war relays powered) this long after the last alarm or sighting. */
 	private static final int ALARM_HOLD = 60 * 20;
@@ -449,10 +454,9 @@ public final class Camps {
 				// at the edge of view, where guards would freeze and the clearing would load chunks on the spot.
 				if (!camp.abandoned() && playerNear(level, camp.center())
 						&& Ground.ready(level, camp.center(), camp.layout().half() + APPROACH_LANE + 1)) {
-					if (playerBlocked(level, camp)) {
-						refuseSite(level, camp);
-					} else {
-						build(level, camp);
+					switch (CampArrival.decide(playerBlocked(level, camp))) {
+						case BUILD -> build(level, camp);
+						case HOLD -> holdSite(level, camp);
 					}
 				}
 			} else if (!camp.conquered()) {
@@ -771,8 +775,8 @@ public final class Camps {
 	}
 
 	/**
-	 * Whether the camp's space holds a block entity (a chest, furnace, sign...) that a player built: the clearing would
-	 * destroy it. Natural ground, trees and plants never have one, so they still get cleared.
+	 * Whether the camp's space holds a block entity (a chest, furnace, sign...) that a player built: building would
+	 * destroy it, so the camp waits. Natural ground, trees and plants never have one, so they still get cleared.
 	 */
 	private static boolean playerBlocked(ServerLevel level, Camp camp) {
 		int ground = Ground.footprint(level, camp.center(), camp.layout().half());
@@ -790,19 +794,13 @@ public final class Camps {
 	}
 
 	/**
-	 * The camp can't be built on this spot: it is forgotten and the map's cost goes back to the Town Center that sold
-	 * it. That Town Center is usually far away, so its chunk is loaded for the one refund.
+	 * A block entity is in the footprint. The camp stays (the slot stays taken, nothing is refunded) until that block
+	 * is gone. The owner hears about it once.
 	 */
-	private static void refuseSite(ServerLevel level, Camp camp) {
-		level.getChunk(camp.town().getX() >> 4, camp.town().getZ() >> 4);
-		if (level.getBlockEntity(camp.town()) instanceof TownCenterBlockEntity center) {
-			for (Resource resource : Resource.values()) {
-				center.addStock(resource, camp.tier().cost(resource));
-			}
+	private static void holdSite(ServerLevel level, Camp camp) {
+		if (!HELD_SITES.add(level.dimension() + "@" + camp.center().asLong())) {
+			return;
 		}
-		// The town may be gone, but the camp must still be forgotten: keeping it would bar the owner from ever
-		// buying another War Map (the registry still counts it as the active camp).
-		CampRegistry.remove(level, camp);
 		if (level.getPlayerByUUID(camp.owner()) instanceof Player owner) {
 			owner.sendSystemMessage(Component.translatable("message.warbands.camp_site_blocked", camp.tier().displayName())
 					.withStyle(ChatFormatting.GOLD));

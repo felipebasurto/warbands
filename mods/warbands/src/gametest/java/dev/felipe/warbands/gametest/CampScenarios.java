@@ -75,7 +75,7 @@ final class CampScenarios {
 				CampScenarios::keep));
 		all.add(new Scenario("camps.abandon", "abandoning a camp: an unbuilt one is forgotten, a built one stays and can still be taken; a new map can be bought",
 				CampScenarios::abandon));
-		all.add(new Scenario("camps.keeps-player-builds", "a player's chest in a camp's footprint: the camp is dropped when the player arrives, the map's cost comes back, the chest survives",
+		all.add(new Scenario("camps.keeps-player-builds", "a player's chest in a camp's footprint: the camp waits, the map's cost stays paid, the slot stays taken, the chest survives",
 				CampScenarios::keepsPlayerBuilds));
 		all.add(new Scenario("camps.revenge-off", "taking a Fort with raids turned off schedules no revenge raid", CampScenarios::revengeOff));
 		all.add(new Scenario("camps.kinds", "every camp kind builds, keeps its guards (vanilla ones too: persistent, no drops), one of each per bag cycle (photos)",
@@ -428,13 +428,18 @@ final class CampScenarios {
 			spot[0] = chest;
 		});
 		run.tp(spot[0].getX() + 0.5, spot[0].getY() + 20, spot[0].getZ() + 40.5, 180.0F, 30.0F);
-		run.waitFor(server -> CampRegistry.active(server.overworld(), player(server).getUUID()).isEmpty(),
-				"a camp with a player's chest in its footprint is dropped", 20 * 30);
+		// Long enough for the arrival check (every 40 ticks) to run once the chunks tick. A chest used to refund the map.
+		run.holds(server -> {
+			ServerLevel level = server.overworld();
+			Camp camp = CampRegistry.active(level, player(server).getUUID()).orElse(null);
+			return camp != null && !camp.built() && level.getBlockState(spot[0]).is(Blocks.CHEST);
+		}, "a chest on an unbuilt camp holds it: no build, the chest stays", 20 * 10);
 		run.server(server -> {
 			ServerLevel level = server.overworld();
-			check(level.getBlockState(spot[0]).is(Blocks.CHEST), "the player's chest survives");
-			check(townCenter(level, core).stock(Resource.FOOD) == food[0], "the map's cost goes back to the Town Center");
-			check(CampRegistry.all(level).stream().noneMatch(c -> c.built() && c.center().getX() == spot[0].getX()), "no camp was built there");
+			ServerPlayer player = player(server);
+			check(townCenter(level, core).stock(Resource.FOOD) == food[0] - CampTier.BANDIT_CAMP.cost(Resource.FOOD),
+					"the map's cost stays paid");
+			check(Camps.whyNot(level, townCenter(level, core), player.getUUID()) != null, "the slot stays taken");
 		});
 	}
 
