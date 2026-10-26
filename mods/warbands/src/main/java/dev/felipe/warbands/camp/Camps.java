@@ -48,6 +48,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Util;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.LivingEntity;
@@ -1041,11 +1042,14 @@ public final class Camps {
 	}
 
 	/** Death bookkeeping: takes the fallen guard off its camp's list, whatever dimension it died in. */
-	public static void guardDied(LivingEntity entity) {
+	public static void guardDied(LivingEntity entity, DamageSource source) {
 		// Guards are mobs; everything else (animals, armor stands, projectiles...) skips the camp scan entirely.
 		if (!(entity.level() instanceof ServerLevel here) || !(entity instanceof Mob)) {
 			return;
 		}
+		// The killing blow is this death. Record the fighter while the guard is still on the list: the damage
+		// callback runs after die(), when the guard has already been removed.
+		noteFight(entity, source);
 		UUID id = entity.getUUID();
 		for (ServerLevel level : here.getServer().getAllLevels()) {
 			if (CampRegistry.all(level).isEmpty()) {
@@ -1054,6 +1058,61 @@ public final class Camps {
 			for (Camp camp : List.copyOf(CampRegistry.all(level))) {
 				if (camp.guards().contains(id)) {
 					CampRegistry.replace(level, camp, camp.withoutGuard(id));
+				}
+			}
+		}
+	}
+
+	/**
+	 * A player took part in this camp's fight: they hit one of its guards, one of their soldiers did, or a guard hit
+	 * them or their soldier. Standing near the banner does not count.
+	 */
+	public static void noteFight(LivingEntity victim, DamageSource source) {
+		if (source == null || !(victim.level() instanceof ServerLevel here)) {
+			return;
+		}
+		Entity attacker = source.getEntity();
+		// Raider soldiers on a camp are guards too, and they are not given GUARD_TAG (that tag is the vanilla mobs).
+		if (isCampGuard(victim)) {
+			UUID fighter = fighterOf(attacker);
+			if (fighter != null) {
+				credit(here, victim.getUUID(), fighter);
+			}
+			return;
+		}
+		if (attacker != null && isCampGuard(attacker)) {
+			UUID fighter = fighterOf(victim);
+			if (fighter != null) {
+				credit(here, attacker.getUUID(), fighter);
+			}
+		}
+	}
+
+	/** A vanilla mob tagged at build, or a raider soldier. Raid raiders also match; {@link #credit} ignores them. */
+	private static boolean isCampGuard(Entity entity) {
+		if (entity.entityTags().contains(GUARD_TAG)) {
+			return true;
+		}
+		return entity instanceof SoldierEntity soldier && soldier.isRaider();
+	}
+
+	/** The player who swung, or the commander of a friendly soldier who did. Raiders and bystanders count as nobody. */
+	private static @Nullable UUID fighterOf(@Nullable Entity entity) {
+		if (entity instanceof Player player && !player.isSpectator()) {
+			return player.getUUID();
+		}
+		if (entity instanceof SoldierEntity soldier && !soldier.isRaider()) {
+			return soldier.ownerId();
+		}
+		return null;
+	}
+
+	/** Adds {@code fighter} to the camp that still lists {@code guard}, in whichever dimension that camp is saved. */
+	private static void credit(ServerLevel here, UUID guard, UUID fighter) {
+		for (ServerLevel level : here.getServer().getAllLevels()) {
+			for (Camp camp : List.copyOf(CampRegistry.all(level))) {
+				if (camp.guards().contains(guard)) {
+					CampRegistry.addParticipant(level, camp, fighter);
 				}
 			}
 		}
@@ -1085,18 +1144,18 @@ public final class Camps {
 			player.sendOverlayMessage(Component.translatable("message.warbands.camp_taken"));
 			return;
 		}
-		// The owner claims while they're on the server. If they're offline, someone who fought beside the banner
-		// (within the party range, not a spectator) can claim for them. Anyone else is turned away.
-		boolean forCommander = false;
-		if (!camp.owner().equals(player.getUUID())) {
-			boolean ownerHere = level.getServer().getPlayerList().getPlayer(camp.owner()) != null;
-			boolean beside = !player.isSpectator() && player.blockPosition().closerThan(pos, Threat.PARTY_RANGE);
-			if (ownerHere || !beside) {
-				player.sendOverlayMessage(Component.translatable("message.warbands.camp_not_yours"));
-				return;
-			}
-			forCommander = true;
+		// The owner claims while they're on the server, whether or not the fight was recorded (single-player included).
+		// If they're offline, only someone who actually fought this camp and is beside the banner (within the party
+		// range, not a spectator) can claim for them. Anyone else is turned away.
+		boolean isOwner = camp.owner().equals(player.getUUID());
+		boolean ownerHere = level.getServer().getPlayerList().getPlayer(camp.owner()) != null;
+		boolean withinPartyRange = player.blockPosition().closerThan(pos, Threat.PARTY_RANGE);
+		if (!CampClaim.mayClaim(isOwner, ownerHere, player.isSpectator(), withinPartyRange,
+				CampRegistry.participants(level, camp).contains(player.getUUID()))) {
+			player.sendOverlayMessage(Component.translatable("message.warbands.camp_not_yours"));
+			return;
 		}
+		boolean forCommander = !isOwner;
 		int left = guardsLeft(level, camp);
 		if (left > 0) {
 			player.sendOverlayMessage(Component.translatable("message.warbands.camp_guards_left", left));

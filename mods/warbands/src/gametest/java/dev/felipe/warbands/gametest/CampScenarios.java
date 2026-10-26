@@ -69,7 +69,7 @@ final class CampScenarios {
 				CampScenarios::others));
 		all.add(new Scenario("camps.caches", "the two stash chests are the ones nearest the banner, not the first the scan hits",
 				CampScenarios::caches));
-		all.add(new Scenario("camps.claim-away", "the owner is offline: a player beside the banner claims for them, and the trophy and relic are left there",
+		all.add(new Scenario("camps.claim-away", "the owner is offline: a bystander beside the banner is refused; a player who hit a guard claims, and the trophy and relic are left there",
 				CampScenarios::claimAway));
 		all.add(new Scenario("camps.keep", "a Castle War Map: Keep 250-400 blocks out, built on arrival, gate, claimed after its guards fall, trophy, revenge, payout (photo)",
 				CampScenarios::keep));
@@ -144,7 +144,7 @@ final class CampScenarios {
 					guard.kill(level);
 				}
 			}
-			// The commander is offline, so someone within the party range could claim. Stand outside it.
+			// The commander is offline. Outside the party range, even a fighter would be refused. This player never fought.
 			player.teleportTo(standard.getX() + 80.5, standard.getY(), standard.getZ() + 0.5);
 			Camps.claim(level, standard, player);
 			check(level.getBlockState(standard).is(ModBlocks.CAMP_STANDARD) && !CampRegistry.all(level).stream()
@@ -208,20 +208,42 @@ final class CampScenarios {
 		});
 	}
 
-	/** Owner offline: the player beside the banner claims, and the prizes stay on the ground. */
+	/** Owner offline: a bystander is refused; a player who hit a guard claims, and the prizes stay on the ground. */
 	private static void claimAway(Run run) {
 		UUID commander = UUID.randomUUID();
 		run.server(server -> {
 			ServerLevel level = server.overworld();
+			ServerPlayer player = player(server);
+			BlockPos idleAt = run.ground.offset(240, 0, 240);
+			Camp idle = new Camp(UUID.randomUUID(), run.ground, CampTier.BANDIT_CAMP, idleAt, Rotation.NONE, true, List.of(),
+					false, false, false, true, 0L, false, "", Threat.NORMAL, true);
+			var data = level.getAttachedOrCreate(ModAttachments.CAMPS);
+			List<Camp> camps = new ArrayList<>(data.camps());
+			camps.add(idle);
+			level.setAttached(ModAttachments.CAMPS, new CampRegistry.Data(List.copyOf(camps), data.bags()));
+			BlockPos idleStandard = Camps.standardPos(idle);
+			player.teleportTo(idleStandard.getX() + 0.5, idleStandard.getY(), idleStandard.getZ() + 1.5);
+			check(player.blockPosition().closerThan(idleStandard, Threat.PARTY_RANGE), "the bystander is beside the banner");
+			Camps.claim(level, idleStandard, player);
+			check(!CampRegistry.all(level).stream().filter(c -> c.center().equals(idleAt)).findFirst().orElseThrow().conquered(),
+					"a bystander beside the banner cannot claim for an absent commander");
+
 			BlockPos site = run.ground.offset(0, 0, 50);
 			loadAround(level, site, 24);
 			Camps.build(level, Camp.chosen(commander, run.ground, CampTier.WITCH_COVEN, site, Rotation.NONE));
 			Camp camp = CampRegistry.all(level).stream().filter(c -> c.owner().equals(commander)).findFirst().orElseThrow();
+			boolean struck = false;
 			for (UUID id : camp.guards()) {
 				if (level.getEntity(id) instanceof LivingEntity guard) {
+					if (!struck) {
+						guard.hurtServer(level, level.damageSources().playerAttack(player), 1.0F);
+						struck = true;
+					}
 					guard.kill(level);
 				}
 			}
+			check(struck, "the coven has a guard to fight");
+			check(CampRegistry.participants(level, camp).contains(player.getUUID()), "hitting a guard records the fighter");
 		});
 		run.waitFor(server -> {
 			Camp camp = CampRegistry.all(server.overworld()).stream().filter(c -> c.owner().equals(commander)).findFirst()

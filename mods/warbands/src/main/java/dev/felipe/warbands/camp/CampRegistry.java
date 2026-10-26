@@ -18,7 +18,7 @@ import net.minecraft.world.level.block.Rotation;
 
 /**
  * Enemy camps sent by War Maps, per dimension. A camp is chosen when the map is bought, built when a player comes
- * close, conquered when its guards are dead and its owner claims the standard, and paid out to the Town Center that
+ * close, conquered when its guards are dead and its standard is claimed, and paid out to the Town Center that
  * sold the map the next time that town is loaded. An abandoned camp frees the owner to buy a new map; if it was already
  * built it stays standing (and can still be taken), otherwise it's forgotten.
  */
@@ -122,12 +122,19 @@ public final class CampRegistry {
 	/**
 	 * {@code camps}: every chosen camp. {@code bags}: per player the kinds still to be drawn (Phase 4C). Saved as a
 	 * map; worlds saved before the kinds existed keep a bare list, which loads as camps with no bags.
+	 * {@code participants}: players who traded blows with a camp, keyed by {@link #key(Camp)}. Saved beside the camps
+	 * because a camp record is already at the codec's field limit. Missing on old saves, so only the owner can claim those.
 	 */
-	public record Data(List<Camp> camps, Map<UUID, Bag> bags) {
+	public record Data(List<Camp> camps, Map<UUID, Bag> bags, Map<String, List<UUID>> participants) {
+		public Data(List<Camp> camps, Map<UUID, Bag> bags) {
+			this(camps, bags, Map.of());
+		}
+
 		public static final Data EMPTY = new Data(List.of(), Map.of());
 		private static final Codec<Data> CURRENT = RecordCodecBuilder.create(i -> i.group(
 				Camp.CODEC.listOf().fieldOf("camps").forGetter(Data::camps),
-				Codec.unboundedMap(UUIDUtil.STRING_CODEC, Bag.CODEC).optionalFieldOf("bags", Map.of()).forGetter(Data::bags))
+				Codec.unboundedMap(UUIDUtil.STRING_CODEC, Bag.CODEC).optionalFieldOf("bags", Map.of()).forGetter(Data::bags),
+				Codec.unboundedMap(Codec.STRING, UUIDUtil.CODEC.listOf()).optionalFieldOf("participants", Map.of()).forGetter(Data::participants))
 				.apply(i, Data::new));
 		public static final Codec<Data> CODEC = Codec.either(Camp.CODEC.listOf(), CURRENT).xmap(
 				either -> either.map(camps -> new Data(camps, Map.of()), d -> d), Either::right);
@@ -150,7 +157,44 @@ public final class CampRegistry {
 		Data data = level.getAttachedOrCreate(ModAttachments.CAMPS);
 		Map<UUID, Bag> bags = new HashMap<>(data.bags());
 		bags.put(owner, bag);
-		level.setAttached(ModAttachments.CAMPS, new Data(data.camps(), Map.copyOf(bags)));
+		level.setAttached(ModAttachments.CAMPS, new Data(data.camps(), Map.copyOf(bags), data.participants()));
+	}
+
+	/** Players recorded as having fought {@code camp}. Empty when nobody has, including on old saves. */
+	public static List<UUID> participants(ServerLevel level, Camp camp) {
+		List<UUID> found = level.getAttachedOrCreate(ModAttachments.CAMPS).participants().get(key(camp));
+		return found == null ? List.of() : found;
+	}
+
+	/** Records {@code fighter} on {@code camp}. A second record of the same player leaves the list as it is. */
+	public static void addParticipant(ServerLevel level, Camp camp, UUID fighter) {
+		Data data = level.getAttachedOrCreate(ModAttachments.CAMPS);
+		List<UUID> current = data.participants().getOrDefault(key(camp), List.of());
+		if (current.contains(fighter)) {
+			return;
+		}
+		List<UUID> next = new ArrayList<>(current);
+		next.add(fighter);
+		Map<String, List<UUID>> participants = new HashMap<>(data.participants());
+		participants.put(key(camp), List.copyOf(next));
+		level.setAttached(ModAttachments.CAMPS, new Data(data.camps(), data.bags(), Map.copyOf(participants)));
+	}
+
+	/** Owner and center: both stay put once a camp is built, which is when a fight can be recorded. */
+	private static String key(Camp camp) {
+		return camp.owner() + ":" + camp.center().asLong();
+	}
+
+	/** Drops fighter lists for camps that are no longer saved. */
+	private static Map<String, List<UUID>> kept(List<Camp> camps, Map<String, List<UUID>> participants) {
+		Map<String, List<UUID>> next = new HashMap<>();
+		for (Camp camp : camps) {
+			List<UUID> fought = participants.get(key(camp));
+			if (fought != null) {
+				next.put(key(camp), fought);
+			}
+		}
+		return Map.copyOf(next);
 	}
 
 	/** The player's camp still to conquer (at most one at a time). An abandoned camp no longer counts. */
@@ -159,27 +203,33 @@ public final class CampRegistry {
 	}
 
 	static void remove(ServerLevel level, Camp camp) {
-		List<Camp> camps = new ArrayList<>(all(level));
+		Data data = level.getAttachedOrCreate(ModAttachments.CAMPS);
+		List<Camp> camps = new ArrayList<>(data.camps());
 		if (camps.remove(camp)) {
-			level.setAttached(ModAttachments.CAMPS, new Data(List.copyOf(camps), level.getAttachedOrCreate(ModAttachments.CAMPS).bags()));
+			List<Camp> keptCamps = List.copyOf(camps);
+			level.setAttached(ModAttachments.CAMPS, new Data(keptCamps, data.bags(), kept(keptCamps, data.participants())));
 		}
 	}
 
 	static void replace(ServerLevel level, Camp old, Camp updated) {
-		List<Camp> camps = new ArrayList<>(all(level));
+		Data data = level.getAttachedOrCreate(ModAttachments.CAMPS);
+		List<Camp> camps = new ArrayList<>(data.camps());
 		int index = camps.indexOf(old);
 		if (index >= 0) {
 			camps.set(index, updated);
 		} else {
 			camps.add(updated);
 		}
-		level.setAttached(ModAttachments.CAMPS, new Data(List.copyOf(camps), level.getAttachedOrCreate(ModAttachments.CAMPS).bags()));
+		List<Camp> keptCamps = List.copyOf(camps);
+		level.setAttached(ModAttachments.CAMPS, new Data(keptCamps, data.bags(), kept(keptCamps, data.participants())));
 	}
 
 	static void add(ServerLevel level, Camp camp) {
-		List<Camp> camps = new ArrayList<>(all(level));
+		Data data = level.getAttachedOrCreate(ModAttachments.CAMPS);
+		List<Camp> camps = new ArrayList<>(data.camps());
 		camps.add(camp);
-		level.setAttached(ModAttachments.CAMPS, new Data(List.copyOf(camps), level.getAttachedOrCreate(ModAttachments.CAMPS).bags()));
+		List<Camp> keptCamps = List.copyOf(camps);
+		level.setAttached(ModAttachments.CAMPS, new Data(keptCamps, data.bags(), kept(keptCamps, data.participants())));
 	}
 
 	/**
@@ -187,7 +237,8 @@ public final class CampRegistry {
 	 * finished ones (paid and burnt down) past a hundred.
 	 */
 	static void trim(ServerLevel level) {
-		List<Camp> camps = new ArrayList<>(all(level));
+		Data data = level.getAttachedOrCreate(ModAttachments.CAMPS);
+		List<Camp> camps = new ArrayList<>(data.camps());
 		int finished = (int) camps.stream().filter(c -> c.paid() && !c.burning()).count();
 		for (int i = 0; i < camps.size() && finished > 100; i++) {
 			if (camps.get(i).paid() && !camps.get(i).burning()) {
@@ -195,6 +246,7 @@ public final class CampRegistry {
 				finished--;
 			}
 		}
-		level.setAttached(ModAttachments.CAMPS, new Data(List.copyOf(camps), level.getAttachedOrCreate(ModAttachments.CAMPS).bags()));
+		List<Camp> keptCamps = List.copyOf(camps);
+		level.setAttached(ModAttachments.CAMPS, new Data(keptCamps, data.bags(), kept(keptCamps, data.participants())));
 	}
 }

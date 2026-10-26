@@ -52,7 +52,7 @@ How to use it:
 ## Camps
 - [ ] `camps.others` - another commander's camps: built, guarded, unbreakable standard; a player outside the party can't claim (photos, ~10 s)
 - [ ] `camps.caches` - the two stash chests are the ones nearest the banner (~8 s)
-- [ ] `camps.claim-away` - owner offline: a player beside the banner claims for them; trophy and relic left there (~15 s)
+- [ ] `camps.claim-away` - owner offline: a bystander beside the banner is refused; a player who hit a guard claims, trophy and relic left there (~15 s)
 - [ ] `camps.keep` - Castle War Map: Keep built on arrival, gate, claim after guards, War Chest survives the burn, trophy, revenge, payout (photo, ~20 s)
 - [ ] `camps.abandon` - abandon unbuilt (forgotten) and built (stays, still takeable); buy again, no refund (~20 s)
 - [x] `camps.keeps-player-builds` - a player's chest in a camp's footprint: the camp is dropped on arrival, the map's cost comes back, the chest survives (~30 s)

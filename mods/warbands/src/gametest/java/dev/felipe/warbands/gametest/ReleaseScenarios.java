@@ -152,10 +152,14 @@ final class ReleaseScenarios {
 			run.server(server -> {
 				ServerLevel level = server.overworld();
 				var player = player(server);
+				// Away: an ally who already fought. This scenario checks the conquest message, not the claim gate.
 				Camp camp = new Camp(away ? UUID.randomUUID() : player.getUUID(), town.core(), tier,
 						run.ground.offset(0, 0, 50), Rotation.NONE, true, List.of(), false, false, false,
 						true, 0L, false, "", Threat.NORMAL, true);
 				level.setAttached(ModAttachments.CAMPS, new CampRegistry.Data(List.of(camp), java.util.Map.of()));
+				if (away) {
+					CampRegistry.addParticipant(level, camp, player.getUUID());
+				}
 				BlockPos standard = Camps.standardPos(camp);
 				player.teleportTo(standard.getX() + 0.5, standard.getY(), standard.getZ() + 2.5);
 				Camps.claim(level, standard, player);
