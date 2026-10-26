@@ -47,7 +47,8 @@ public class Warbands implements ModInitializer {
 		ServerLivingEntityEvents.ALLOW_DAMAGE.register(
 				(victim, source, amount) -> !SoldierEntity.isFriendlyFire(victim, source.getEntity()));
 
-		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> Camps.guardDied(entity));
+		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamageTaken, damageTaken, blocked) -> Camps.noteFight(entity, source));
+		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> Camps.guardDied(entity, source));
 
 		// Buildings can't be mined for materials.
 		PlayerBlockBreakEvents.BEFORE.register(TownCenterBlock::beforeBreak);
