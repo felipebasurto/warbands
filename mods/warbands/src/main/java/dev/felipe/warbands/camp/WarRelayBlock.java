@@ -46,7 +46,19 @@ public class WarRelayBlock extends Block {
 	@Override
 	protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
 		boolean inCamp = Camps.campAt(level, pos).isPresent();
-		boolean alarmed = inCamp && Camps.alarmedAt(level, pos);
+		// Placed with the structure before the camp is recorded: keep a slow check. Once no camp will claim it,
+		// drop any leftover signal (wired traps would otherwise stay live) and stop ticking for good.
+		int delay = WarRelayTiming.nextDelay(inCamp, !inCamp && pendingCamp(level, pos), STEP);
+		if (!inCamp) {
+			if (state.getValue(POWERED)) {
+				level.setBlock(pos, state.setValue(POWERED, false), Block.UPDATE_ALL);
+			}
+			if (delay >= 0) {
+				level.scheduleTick(pos, this, delay);
+			}
+			return;
+		}
+		boolean alarmed = Camps.alarmedAt(level, pos);
 		boolean powered = alarmed && (!state.getValue(PULSE) || !state.getValue(POWERED));
 		if (powered != state.getValue(POWERED)) {
 			level.setBlock(pos, state.setValue(POWERED, powered), Block.UPDATE_ALL);
@@ -55,8 +67,22 @@ public class WarRelayBlock extends Block {
 			level.sendParticles(new DustParticleOptions(0xFF2020, 1.2F), pos.getX() + 0.5, pos.getY() + 1.1, pos.getZ() + 0.5,
 					3, 0.25, 0.1, 0.25, 0.0);
 		}
-		// Outside a camp (not registered yet, or its camp gone) it idles on a slow check instead of stopping for good.
-		level.scheduleTick(pos, this, inCamp ? STEP : STEP * 10);
+		level.scheduleTick(pos, this, delay);
+	}
+
+	/** An unbuilt camp whose footprint will contain {@code pos} once it is registered. Same margin as {@link Camps#campAt}. */
+	private static boolean pendingCamp(ServerLevel level, BlockPos pos) {
+		for (CampRegistry.Camp camp : CampRegistry.all(level)) {
+			if (camp.built() || camp.abandoned() || camp.razed()) {
+				continue;
+			}
+			BlockPos center = camp.center();
+			if (WarRelayTiming.inFootprint(pos.getX() - center.getX(), pos.getY() - center.getY(), pos.getZ() - center.getZ(),
+					camp.layout().half(), camp.layout().height())) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override
