@@ -245,7 +245,7 @@ public final class Raids {
 					Component.translatable("message.warbands.raid_warning_subtitle", kind.displayName(), Directions.compass(raids.town(), spawn)));
 		}
 		ServerBossEvent bar = bar(level, raids.town());
-		bar.setName(Component.translatable("bossbar.warbands.raid_warning", kind.displayName()));
+		bar.setName(warningBarName(kind));
 		bar.setProgress(1.0F);
 	}
 
@@ -257,6 +257,12 @@ public final class Raids {
 		}
 		ServerPlayer owner = ownerNearby(level, raids);
 		ServerBossEvent bar = bar(level, raids.town());
+		// The bar is memory-only. Players are attached below, so a reload during the warning has to put the
+		// kind back on the title first. The lang line is "%s raid approaching"; with no argument the client
+		// shows that "%s" literally.
+		if (active.phase() == Phase.WARNING) {
+			bar.setName(warningBarName(active.kind()));
+		}
 		updateBarPlayers(level, bar, raids.town());
 		switch (active.phase()) {
 			case WARNING -> {
@@ -561,6 +567,11 @@ public final class Raids {
 	private static ServerBossEvent bar(ServerLevel level, BlockPos town) {
 		return BARS.computeIfAbsent(key(level, town), k -> new ServerBossEvent(UUID.randomUUID(),
 				Component.translatable("bossbar.warbands.raid_warning"), BossEvent.BossBarColor.RED, BossEvent.BossBarOverlay.NOTCHED_10));
+	}
+
+	/** Warning title. The kind is the {@code %s} in {@code bossbar.warbands.raid_warning}. */
+	static Component warningBarName(RaidKind kind) {
+		return Component.translatable("bossbar.warbands.raid_warning", kind.displayName());
 	}
 
 	/** Everyone near the town sees the bar. */
