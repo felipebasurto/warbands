@@ -1,5 +1,6 @@
 package dev.felipe.warbands.town;
 
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import dev.felipe.warbands.camp.Camps;
 import dev.felipe.warbands.WarbandsAdvancements;
@@ -72,13 +73,29 @@ public class TownCenterMenu extends AbstractContainerMenu {
 			ItemStack stack = container.getItem(0);
 			if (!stack.isEmpty() && level.getBlockEntity(pos) instanceof TownCenterBlockEntity townCenter) {
 				ItemStack left = townCenter.deposit(stack.copy());
-				if (left.getCount() < stack.getCount() && this.player instanceof ServerPlayer serverPlayer) {
-					WarbandsAdvancements.award(serverPlayer, WarbandsAdvancements.STOCKPILE);
+				if (this.player instanceof ServerPlayer serverPlayer) {
+					if (left.getCount() < stack.getCount()) {
+						WarbandsAdvancements.award(serverPlayer, WarbandsAdvancements.STOCKPILE);
+					} else if (ResourceValues.of(stack) == null && !heldForAdvance(stack)) {
+						serverPlayer.sendOverlayMessage(Component.translatable("message.warbands.deposit_rejected",
+								Component.translatable(stack.getItem().getDescriptionId())));
+					}
 				}
 				container.setItem(0, left);
 			}
 		});
 		converting = false;
+	}
+
+	/** Age trophies sit in Deposit until Advance. They are not stockpile resources, and refusing them would be wrong. */
+	private static boolean heldForAdvance(ItemStack stack) {
+		for (Age age : Age.values()) {
+			Item requirement = age.requirement();
+			if (requirement != null && stack.is(requirement)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override

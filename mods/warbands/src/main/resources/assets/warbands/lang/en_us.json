@@ -37,6 +37,7 @@
   "gui.warbands.accepts.stone": "Cobblestone, stone, deepslate... = 1",
   "gui.warbands.accepts.gold": "Nugget = 1, ingot = 9, block = 81",
   "message.warbands.not_your_town": "This Town Center belongs to %s",
+  "message.warbands.deposit_rejected": "The Town Center doesn't accept %s",
   "message.warbands.need_houses": "Population limit reached: build more houses",
   "message.warbands.blocked": "Something is in the way (only natural terrain can be cleared)",
   "message.warbands.step_back": "Step out of the building area",
